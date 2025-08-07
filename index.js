@@ -57,7 +57,7 @@ app.post('/echo', checkAuth, (req, res) => {
 app.get('/blueprint', checkAuth, (req, res) => {
   const rpgParam = req.headers['rpginside'];
 
-  if (!rpgParam || rpgParam !== 'expected-value') {
+  if (!rpgParam || rpgParam !== 'rt.ru') {
     return res.status(403).json({ error: 'Missing or invalid rpginside header' });
   }
 
