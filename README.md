@@ -1,6 +1,6 @@
 # Simple Token-Protected API
 
-A lightweight Express.js API with a fixed bearer token for authentication, designed to be deployed on [Render.com](https://render.com).
+A lightweight Express.js API with a fixed bearer token for authentication, designed to be deployed on [Render.com](https://render.com)... or anywhere else you can run Node.js :)
 
 ## Endpoints
 
