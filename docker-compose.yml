@@ -8,22 +8,22 @@ services:
     container_name: roarinapi
     restart: unless-stopped
     ports:
+      # Map both common ports - server will use the configured one
+      - "443:443"
       - "4242:4242"
     volumes:
       # Persist configuration and data across container restarts
       - roarinapi-data:/app/data
     environment:
       - NODE_ENV=production
-      - PORT=4242
       - HOST=0.0.0.0
-      # Optional: Set admin password via environment variable
-      # - ADMIN_PASSWORD=your-secure-password
+      # PORT is now read from config.json, not env var
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4242/health"]
+      test: ["CMD-SHELL", "wget --no-check-certificate --no-verbose --tries=1 --spider https://localhost:443/health 2>/dev/null || wget --no-check-certificate --no-verbose --tries=1 --spider https://localhost:4242/health 2>/dev/null || wget --no-verbose --tries=1 --spider http://localhost:4242/health || exit 1"]
       interval: 30s
-      timeout: 3s
+      timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 15s
     # Resource limits (adjust based on scalability settings)
     deploy:
       resources:

@@ -34,14 +34,13 @@ COPY --chown=roarinapi:roarinapi package.json ./
 # Create data directory for persistent storage (including certs subdirectory)
 RUN mkdir -p /app/data/certs && chown -R roarinapi:roarinapi /app/data
 
-# Environment variables
+# Environment variables (PORT intentionally not set - read from config.json)
 ENV NODE_ENV=production \
-    PORT=4242 \
     HOST=0.0.0.0 \
     DATA_DIR=/app/data
 
-# Expose port
-EXPOSE 4242
+# Expose common ports
+EXPOSE 443 4242
 
 # Health check - try HTTPS first, fall back to HTTP, use configured port
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
