@@ -436,9 +436,26 @@
             <option value="redirect">Redirect</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" x-show="form.responseType === 'json'">
           <label class="form-label">JSON Response</label>
           <textarea class="form-textarea" x-model="form.responseJson" placeholder='{"message": "Hello"}'></textarea>
+        </div>
+        <div class="form-group" x-show="form.responseType === 'text'">
+          <label class="form-label">Text Response</label>
+          <textarea class="form-textarea" x-model="form.responseText" placeholder="Plain text response..."></textarea>
+        </div>
+        <div class="form-group" x-show="form.responseType === 'binary'">
+          <label class="form-label">Binary File</label>
+          <input type="file" class="form-input" @change="handleFileSelect($event)" accept="image/*,application/octet-stream,*/*">
+          <small style="display: block; margin-top: 0.5rem; color: var(--gray-500);" x-show="form.fileName" x-text="'Current file: ' + form.fileName"></small>
+          <div class="form-group" style="margin-top: 0.5rem;">
+            <label class="form-label">Content-Type (auto-detected)</label>
+            <input type="text" class="form-input" x-model="form.contentType" placeholder="image/png">
+          </div>
+        </div>
+        <div class="form-group" x-show="form.responseType === 'redirect'">
+          <label class="form-label">Redirect URL</label>
+          <input type="text" class="form-input" x-model="form.redirectUrl" placeholder="https://example.com">
         </div>
         <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1rem;">
           <button type="button" class="btn btn-secondary" @click="modal = false">Cancel</button>
@@ -459,7 +476,7 @@
         resources: null, nginxConfig: '', showNginx: false, nginxMsg: '', nginxErr: false,
         curPwd: '', newPwd: '', settingsMsg: '', settingsErr: false,
         currentPort: 4242, newPort: 4242, portMsg: '', portErr: false, portChanged: false,
-        form: { method: 'GET', path: '/', description: '', protected: false, token: '', parameterSource: 'none', responseType: 'json', responseJson: '{}', enabled: true },
+        form: { method: 'GET', path: '/', description: '', protected: false, token: '', parameterSource: 'none', responseType: 'json', responseJson: '{}', responseText: '', fileName: '', contentType: '', redirectUrl: '', fileData: null, enabled: true },
 
         get memUsed() { return Math.round((this.systemInfo?.memory?.heapUsed || 0) / 1024 / 1024); },
         get memTotal() { return Math.round((this.systemInfo?.memory?.heapTotal || 0) / 1024 / 1024); },
@@ -536,23 +553,57 @@
 
         openModal() {
           this.editing = null;
-          this.form = { method: 'GET', path: '/', description: '', protected: false, token: '', parameterSource: 'none', responseType: 'json', responseJson: '{}', enabled: true };
+          this.form = { method: 'GET', path: '/', description: '', protected: false, token: '', parameterSource: 'none', responseType: 'json', responseJson: '{}', responseText: '', fileName: '', contentType: '', redirectUrl: '', fileData: null, enabled: true };
           this.modal = true;
         },
 
         editEndpoint(ep) {
           this.editing = ep;
-          this.form = { ...ep, responseJson: JSON.stringify(ep.responses?.[0]?.data || {}, null, 2) };
+          const resp = ep.responses?.[0] || {};
+          this.form = { 
+            ...ep, 
+            responseJson: ep.responseType === 'json' ? JSON.stringify(resp.data || {}, null, 2) : '{}',
+            responseText: resp.text || '',
+            fileName: resp.fileName || '',
+            contentType: resp.contentType || '',
+            redirectUrl: resp.redirectUrl || '',
+            fileData: null
+          };
           this.modal = true;
         },
 
+        handleFileSelect(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          this.form.fileName = file.name;
+          this.form.contentType = file.type || 'application/octet-stream';
+          const reader = new FileReader();
+          reader.onload = (ev) => { this.form.fileData = ev.target.result; };
+          reader.readAsDataURL(file);
+        },
+
         async saveEndpoint() {
-          let data;
-          try { data = JSON.parse(this.form.responseJson); } catch { data = {}; }
-          const payload = { ...this.form, responses: [{ condition: null, data }] };
+          let response = { condition: null };
+          if (this.form.responseType === 'json') {
+            try { response.data = JSON.parse(this.form.responseJson); } catch { response.data = {}; }
+          } else if (this.form.responseType === 'text') {
+            response.text = this.form.responseText;
+          } else if (this.form.responseType === 'binary') {
+            response.fileName = this.form.fileName;
+            response.contentType = this.form.contentType;
+            if (this.form.fileData) response.fileData = this.form.fileData;
+          } else if (this.form.responseType === 'redirect') {
+            response.redirectUrl = this.form.redirectUrl;
+          }
+          const payload = { ...this.form, responses: [response] };
+          delete payload.fileData; // Don't send fileData in main payload
           const url = this.editing ? `/api/admin/endpoints/${this.editing.id}` : '/api/admin/endpoints';
           const method = this.editing ? 'PUT' : 'POST';
           try {
+            // For binary, include fileData in the response
+            if (this.form.responseType === 'binary' && this.form.fileData) {
+              payload.responses[0].fileData = this.form.fileData;
+            }
             await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             this.modal = false; await this.loadEndpoints(); await this.loadSystem();
           } catch (e) {}

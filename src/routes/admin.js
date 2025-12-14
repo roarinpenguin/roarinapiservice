@@ -121,6 +121,19 @@ async function adminRoutes(fastify, options) {
       return reply.code(400).send({ error: 'Path is reserved' });
     }
     
+    // Process binary file uploads
+    let processedResponses = responses || [{ condition: null, data: {} }];
+    if (responseType === 'binary' && responses?.[0]?.fileData) {
+      const resp = responses[0];
+      const asset = configManager.saveAssetFromBase64(resp.fileName || 'file.bin', resp.fileData);
+      processedResponses = [{
+        condition: resp.condition || null,
+        fileName: resp.fileName,
+        contentType: resp.contentType,
+        assetPath: asset.assetPath
+      }];
+    }
+    
     const endpoint = configManager.createEndpoint({
       path,
       method: method.toUpperCase(),
@@ -130,7 +143,7 @@ async function adminRoutes(fastify, options) {
       parameterSource: parameterSource || 'none',
       parameters: parameters || [],
       responseType: responseType || 'json',
-      responses: responses || [{ condition: null, data: {} }],
+      responses: processedResponses,
       enabled: enabled !== false
     });
     
@@ -139,7 +152,21 @@ async function adminRoutes(fastify, options) {
   
   // Update endpoint
   fastify.put('/endpoints/:id', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
-    const endpoint = configManager.updateEndpoint(request.params.id, request.body);
+    const updates = { ...request.body };
+    
+    // Process binary file uploads for updates
+    if (updates.responseType === 'binary' && updates.responses?.[0]?.fileData) {
+      const resp = updates.responses[0];
+      const asset = configManager.saveAssetFromBase64(resp.fileName || 'file.bin', resp.fileData);
+      updates.responses = [{
+        condition: resp.condition || null,
+        fileName: resp.fileName,
+        contentType: resp.contentType,
+        assetPath: asset.assetPath
+      }];
+    }
+    
+    const endpoint = configManager.updateEndpoint(request.params.id, updates);
     if (!endpoint) {
       return reply.code(404).send({ error: 'Endpoint not found' });
     }

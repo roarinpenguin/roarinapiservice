@@ -221,6 +221,27 @@ function saveAsset(filename, buffer) {
   return { id: assetId, filename, path: assetPath, ext };
 }
 
+// Save binary from base64 data URL
+function saveAssetFromBase64(filename, base64Data) {
+  ensureDirectories();
+  const assetId = crypto.randomUUID();
+  const ext = path.extname(filename) || '.bin';
+  const assetPath = path.join(ASSETS_DIR, `${assetId}${ext}`);
+  
+  // Extract base64 data from data URL (format: data:image/png;base64,xxxxx)
+  const matches = base64Data.match(/^data:([^;]+);base64,(.+)$/);
+  if (matches) {
+    const buffer = Buffer.from(matches[2], 'base64');
+    fs.writeFileSync(assetPath, buffer);
+  } else {
+    // Plain base64
+    const buffer = Buffer.from(base64Data, 'base64');
+    fs.writeFileSync(assetPath, buffer);
+  }
+  
+  return { id: assetId, filename, assetPath: `${assetId}${ext}` };
+}
+
 function getAsset(assetId) {
   const files = fs.readdirSync(ASSETS_DIR);
   const assetFile = files.find(f => f.startsWith(assetId));
@@ -349,6 +370,7 @@ module.exports = {
   updateEndpoint,
   deleteEndpoint,
   saveAsset,
+  saveAssetFromBase64,
   getAsset,
   deleteAsset,
   exportConfig,

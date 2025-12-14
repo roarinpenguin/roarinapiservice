@@ -124,12 +124,26 @@ async function dynamicRoutes(fastify, options) {
         return reply.send(jsonData);
         
       case 'text':
-        const textData = processTemplateString(responseData.data, params, request);
+        const textResponse = responseData.text || responseData.data || '';
         reply.header('Content-Type', 'text/plain');
-        return reply.send(textData);
+        return reply.send(processTemplateString(String(textResponse), params, request));
         
       case 'binary':
       case 'image':
+        // Handle assetPath (new format from UI upload)
+        if (responseData.assetPath) {
+          const assetFullPath = path.join(configManager.ASSETS_DIR, responseData.assetPath);
+          if (!fs.existsSync(assetFullPath)) {
+            return reply.code(404).send({ error: 'Asset file not found' });
+          }
+          const buffer = fs.readFileSync(assetFullPath);
+          reply.header('Content-Type', responseData.contentType || 'application/octet-stream');
+          if (responseData.fileName) {
+            reply.header('Content-Disposition', `inline; filename="${responseData.fileName}"`);
+          }
+          return reply.send(buffer);
+        }
+        // Handle assetId (legacy format)
         if (responseData.assetId) {
           const asset = configManager.getAsset(responseData.assetId);
           if (!asset) {
@@ -160,7 +174,7 @@ async function dynamicRoutes(fastify, options) {
         return reply.code(500).send({ error: 'Binary response not configured properly' });
         
       case 'redirect':
-        return reply.redirect(responseData.url || '/');
+        return reply.redirect(responseData.redirectUrl || responseData.url || '/');
         
       default:
         return reply.send(responseData.data);
