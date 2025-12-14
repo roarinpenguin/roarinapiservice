@@ -74,8 +74,8 @@ async function buildServer(httpsOptions = null) {
 async function start() {
   const config = configManager.load();
   
-  // Determine port: env var > config file > default
-  const port = process.env.PORT || config.port || 4242;
+  // Determine port: config file > env var > default (config takes priority for admin UI changes)
+  const port = config.port || process.env.PORT || 4242;
   process.env.PORT = port; // Ensure it's set for other modules
   
   // Determine protocol mode: env var > config file > default (https)
