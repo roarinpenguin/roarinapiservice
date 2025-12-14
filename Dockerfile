@@ -15,8 +15,8 @@ RUN npm ci --only=production && npm cache clean --force
 # Production stage
 FROM node:20-alpine
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install dumb-init for proper signal handling and openssl for certificate generation
+RUN apk add --no-cache dumb-init openssl
 
 # Create non-root user
 RUN addgroup -g 1001 -S roarinapi && \
@@ -31,8 +31,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --chown=roarinapi:roarinapi src ./src
 COPY --chown=roarinapi:roarinapi package.json ./
 
-# Create data directory for persistent storage
-RUN mkdir -p /app/data && chown -R roarinapi:roarinapi /app/data
+# Create data directory for persistent storage (including certs subdirectory)
+RUN mkdir -p /app/data/certs && chown -R roarinapi:roarinapi /app/data
 
 # Environment variables
 ENV NODE_ENV=production \

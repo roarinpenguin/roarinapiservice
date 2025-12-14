@@ -768,13 +768,19 @@
         async loadTls() {
           try {
             const r = await fetch('/api/admin/tls');
-            if (!r.ok) return;
+            if (!r.ok) {
+              const err = await r.json().catch(() => ({}));
+              this.tlsErr = true;
+              this.tlsMsg = err.error || 'Failed to load TLS config';
+              return;
+            }
             const d = await r.json();
             this.tls.enabled = d.enabled;
             this.tls.certType = d.useCustom ? 'custom' : 'selfsigned';
             this.tls.selfSignedExists = d.selfSignedExists;
             this.tls.customExists = d.customExists;
             this.tls.customInfo = d.customInfo || '';
+            this.tlsErr = false; this.tlsMsg = '';
           } catch (e) { console.error('loadTls error:', e); }
         },
 
