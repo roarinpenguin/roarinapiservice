@@ -119,6 +119,27 @@ const defaultEndpoints = [
     ],
     enabled: true,
     createdAt: new Date().toISOString()
+  },
+  {
+    id: crypto.randomUUID(),
+    path: '/blueprint',
+    method: 'GET',
+    description: 'Returns the API blueprint image',
+    protected: false,
+    token: null,
+    parameterSource: 'none',
+    parameters: [],
+    responseType: 'binary',
+    responses: [
+      {
+        condition: null,
+        fileName: 'blueprint.png',
+        contentType: 'image/png',
+        assetPath: 'blueprint.png'
+      }
+    ],
+    enabled: true,
+    createdAt: new Date().toISOString()
   }
 ];
 
