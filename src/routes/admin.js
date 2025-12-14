@@ -1,6 +1,7 @@
 'use strict';
 
 const configManager = require('../config/configManager');
+const certificates = require('../utils/certificates');
 const { exec } = require('child_process');
 
 async function adminRoutes(fastify, options) {
@@ -378,6 +379,95 @@ async function adminRoutes(fastify, options) {
         }
       });
     });
+  });
+  
+  // ===== TLS/HTTPS CONFIGURATION =====
+  
+  // Get TLS configuration
+  fastify.get('/tls', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
+    const config = configManager.load();
+    const certInfo = certificates.getCertificateInfo();
+    
+    return {
+      enabled: config.tls?.enabled !== false,
+      useCustom: config.tls?.useCustom || false,
+      selfSignedExists: certInfo.selfSignedExists,
+      customExists: certInfo.customExists,
+      customInfo: certInfo.customInfo
+    };
+  });
+  
+  // Update TLS configuration
+  fastify.put('/tls', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
+    const { enabled, useCustom } = request.body;
+    const config = configManager.load();
+    
+    config.tls = {
+      enabled: enabled !== false,
+      useCustom: useCustom || false
+    };
+    
+    configManager.save(config);
+    
+    return { 
+      success: true, 
+      tls: config.tls,
+      message: 'TLS configuration updated. Server restart required.',
+      restartRequired: true
+    };
+  });
+  
+  // Generate self-signed certificates
+  fastify.post('/tls/generate', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
+    const result = certificates.generateSelfSigned();
+    
+    if (result) {
+      return { success: true, message: 'Self-signed certificates generated successfully' };
+    } else {
+      return reply.code(500).send({ error: 'Failed to generate certificates. Make sure openssl is installed.' });
+    }
+  });
+  
+  // Upload custom certificates
+  fastify.post('/tls/upload', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
+    const { keyData, certData } = request.body;
+    
+    if (!keyData || !certData) {
+      return reply.code(400).send({ error: 'Both key and certificate are required' });
+    }
+    
+    try {
+      certificates.saveCustomCertificate(keyData, certData);
+      
+      // Update config to use custom certs
+      const config = configManager.load();
+      config.tls = { ...config.tls, enabled: true, useCustom: true };
+      configManager.save(config);
+      
+      return { 
+        success: true, 
+        message: 'Custom certificates uploaded. Server restart required.',
+        restartRequired: true
+      };
+    } catch (err) {
+      return reply.code(500).send({ error: 'Failed to save certificates: ' + err.message });
+    }
+  });
+  
+  // Delete custom certificates
+  fastify.delete('/tls/custom', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
+    const success = certificates.deleteCustomCertificates();
+    
+    if (success) {
+      // Update config to use self-signed
+      const config = configManager.load();
+      if (config.tls) config.tls.useCustom = false;
+      configManager.save(config);
+      
+      return { success: true, message: 'Custom certificates deleted' };
+    } else {
+      return reply.code(500).send({ error: 'Failed to delete certificates' });
+    }
   });
 }
 

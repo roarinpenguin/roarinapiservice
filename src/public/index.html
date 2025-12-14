@@ -381,6 +381,70 @@
           <small style="display: block; margin-top: 0.5rem; color: var(--gray-500);">Warning: You will be disconnected briefly</small>
         </div>
       </div>
+      
+      <!-- TLS/HTTPS Configuration -->
+      <div class="card" style="margin-top: 1.5rem;">
+        <div class="card-title">🔐 TLS / HTTPS Configuration</div>
+        <div x-show="tlsMsg" class="alert" :class="tlsErr ? 'alert-error' : 'alert-success'" x-text="tlsMsg"></div>
+        
+        <div class="form-group">
+          <label class="checkbox-wrap">
+            <input type="checkbox" x-model="tls.enabled" @change="updateTls()">
+            <span>Enable HTTPS</span>
+          </label>
+          <small style="display: block; margin-top: 0.25rem; color: var(--gray-500);">When disabled, server runs on HTTP only</small>
+        </div>
+        
+        <div x-show="tls.enabled" style="margin-top: 1rem;">
+          <div class="form-group">
+            <label class="form-label">Certificate Type</label>
+            <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+              <label class="checkbox-wrap">
+                <input type="radio" name="certType" value="selfsigned" x-model="tls.certType" @change="updateTls()">
+                <span>Self-signed (auto-generated)</span>
+              </label>
+              <label class="checkbox-wrap">
+                <input type="radio" name="certType" value="custom" x-model="tls.certType" @change="updateTls()">
+                <span>Custom certificates</span>
+              </label>
+            </div>
+          </div>
+          
+          <div x-show="tls.certType === 'selfsigned'" style="margin-top: 1rem; padding: 1rem; background: var(--purple-50); border-radius: 10px;">
+            <p style="margin-bottom: 0.5rem;">
+              <strong>Status:</strong> 
+              <span x-show="tls.selfSignedExists" style="color: #059669;">✅ Self-signed certificates ready</span>
+              <span x-show="!tls.selfSignedExists" style="color: #dc2626;">❌ Not generated yet</span>
+            </p>
+            <button class="btn btn-secondary btn-sm" @click="generateCerts()">🔄 Regenerate Certificates</button>
+          </div>
+          
+          <div x-show="tls.certType === 'custom'" style="margin-top: 1rem;">
+            <div x-show="tls.customExists" style="padding: 1rem; background: var(--purple-50); border-radius: 10px; margin-bottom: 1rem;">
+              <p style="margin-bottom: 0.5rem;"><strong>Status:</strong> <span style="color: #059669;">✅ Custom certificates installed</span></p>
+              <small x-text="tls.customInfo" style="color: var(--gray-600);"></small>
+              <div style="margin-top: 0.5rem;">
+                <button class="btn btn-danger btn-sm" @click="deleteCustomCerts()">🗑️ Delete Custom Certs</button>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">Server Private Key (.key file)</label>
+              <input type="file" class="form-input" accept=".key,.pem" @change="handleKeyFile($event)">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Server Certificate (.crt or .pem file)</label>
+              <input type="file" class="form-input" accept=".crt,.pem,.cer" @change="handleCertFile($event)">
+            </div>
+            <button class="btn btn-primary" @click="uploadCerts()" :disabled="!tlsKeyData || !tlsCertData">📤 Upload Certificates</button>
+          </div>
+        </div>
+        
+        <div x-show="tlsChanged" style="margin-top: 1rem; padding: 0.75rem; background: #fef3c7; border-radius: 8px; color: #92400e;">
+          ⚠️ Server restart required to apply TLS changes
+          <button class="btn btn-danger btn-sm" style="margin-left: 0.5rem;" @click="restartServer()">🔄 Restart Now</button>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -476,6 +540,8 @@
         resources: null, nginxConfig: '', showNginx: false, nginxMsg: '', nginxErr: false,
         curPwd: '', newPwd: '', settingsMsg: '', settingsErr: false,
         currentPort: 4242, newPort: 4242, portMsg: '', portErr: false, portChanged: false,
+        tls: { enabled: true, certType: 'selfsigned', selfSignedExists: false, customExists: false, customInfo: '' },
+        tlsMsg: '', tlsErr: false, tlsChanged: false, tlsKeyData: null, tlsCertData: null,
         form: { method: 'GET', path: '/', description: '', protected: false, token: '', parameterSource: 'none', responseType: 'json', responseJson: '{}', responseText: '', fileName: '', contentType: '', redirectUrl: '', fileData: null, enabled: true },
 
         get memUsed() { return Math.round((this.systemInfo?.memory?.heapUsed || 0) / 1024 / 1024); },
@@ -519,11 +585,17 @@
         },
 
         async loadAll() {
-          await Promise.all([this.loadEndpoints(), this.loadSystem(), this.loadScalability()]);
+          await Promise.all([this.loadEndpoints(), this.loadSystem(), this.loadScalability(), this.loadTls()]);
         },
 
         async loadEndpoints() {
-          try { const r = await fetch('/api/admin/endpoints'); const d = await r.json(); this.endpoints = d.endpoints || []; } catch (e) {}
+          try { 
+            const r = await fetch('/api/admin/endpoints'); 
+            if (!r.ok) { console.error('Failed to load endpoints:', r.status); return; }
+            const d = await r.json(); 
+            console.log('Loaded endpoints:', d);
+            this.endpoints = d.endpoints || []; 
+          } catch (e) { console.error('loadEndpoints error:', e); }
         },
 
         async loadSystem() {
@@ -604,9 +676,14 @@
             if (this.form.responseType === 'binary' && this.form.fileData) {
               payload.responses[0].fileData = this.form.fileData;
             }
-            await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!r.ok) {
+              const err = await r.json();
+              alert('Error: ' + (err.error || 'Failed to save endpoint'));
+              return;
+            }
             this.modal = false; await this.loadEndpoints(); await this.loadSystem();
-          } catch (e) {}
+          } catch (e) { console.error('Save error:', e); alert('Error saving endpoint'); }
         },
 
         async deleteEndpoint(id) {
@@ -686,6 +763,94 @@
           if (d > 0) return `${d}d ${h}h ${m}m`;
           if (h > 0) return `${h}h ${m}m`;
           return `${m}m ${Math.floor(s % 60)}s`;
+        },
+
+        async loadTls() {
+          try {
+            const r = await fetch('/api/admin/tls');
+            if (!r.ok) return;
+            const d = await r.json();
+            this.tls.enabled = d.enabled;
+            this.tls.certType = d.useCustom ? 'custom' : 'selfsigned';
+            this.tls.selfSignedExists = d.selfSignedExists;
+            this.tls.customExists = d.customExists;
+            this.tls.customInfo = d.customInfo || '';
+          } catch (e) { console.error('loadTls error:', e); }
+        },
+
+        async updateTls() {
+          this.tlsMsg = ''; this.tlsErr = false;
+          try {
+            const r = await fetch('/api/admin/tls', { 
+              method: 'PUT', 
+              headers: { 'Content-Type': 'application/json' }, 
+              body: JSON.stringify({ enabled: this.tls.enabled, useCustom: this.tls.certType === 'custom' }) 
+            });
+            const d = await r.json();
+            if (d.success) { this.tlsChanged = d.restartRequired; this.tlsMsg = d.message; }
+            else { this.tlsErr = true; this.tlsMsg = d.error; }
+          } catch (e) { this.tlsErr = true; this.tlsMsg = 'Failed to update TLS'; }
+        },
+
+        async generateCerts() {
+          this.tlsMsg = ''; this.tlsErr = false;
+          try {
+            const r = await fetch('/api/admin/tls/generate', { method: 'POST' });
+            const d = await r.json();
+            if (d.success) { this.tlsMsg = d.message; this.tls.selfSignedExists = true; }
+            else { this.tlsErr = true; this.tlsMsg = d.error; }
+          } catch (e) { this.tlsErr = true; this.tlsMsg = 'Failed to generate certificates'; }
+        },
+
+        handleKeyFile(e) {
+          const file = e.target.files[0]; if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (ev) => { this.tlsKeyData = ev.target.result; };
+          reader.readAsDataURL(file);
+        },
+
+        handleCertFile(e) {
+          const file = e.target.files[0]; if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (ev) => { this.tlsCertData = ev.target.result; };
+          reader.readAsDataURL(file);
+        },
+
+        async uploadCerts() {
+          if (!this.tlsKeyData || !this.tlsCertData) { alert('Please select both key and certificate files'); return; }
+          this.tlsMsg = ''; this.tlsErr = false;
+          try {
+            const r = await fetch('/api/admin/tls/upload', { 
+              method: 'POST', 
+              headers: { 'Content-Type': 'application/json' }, 
+              body: JSON.stringify({ keyData: this.tlsKeyData, certData: this.tlsCertData }) 
+            });
+            const d = await r.json();
+            if (d.success) { 
+              this.tlsMsg = d.message; 
+              this.tlsChanged = d.restartRequired; 
+              this.tls.customExists = true;
+              this.tlsKeyData = null; this.tlsCertData = null;
+              await this.loadTls();
+            }
+            else { this.tlsErr = true; this.tlsMsg = d.error; }
+          } catch (e) { this.tlsErr = true; this.tlsMsg = 'Failed to upload certificates'; }
+        },
+
+        async deleteCustomCerts() {
+          if (!confirm('Delete custom certificates? Server will fall back to self-signed.')) return;
+          this.tlsMsg = ''; this.tlsErr = false;
+          try {
+            const r = await fetch('/api/admin/tls/custom', { method: 'DELETE' });
+            const d = await r.json();
+            if (d.success) { 
+              this.tlsMsg = d.message; 
+              this.tls.customExists = false;
+              this.tls.certType = 'selfsigned';
+              await this.loadTls();
+            }
+            else { this.tlsErr = true; this.tlsMsg = d.error; }
+          } catch (e) { this.tlsErr = true; this.tlsMsg = 'Failed to delete certificates'; }
         }
       };
     }

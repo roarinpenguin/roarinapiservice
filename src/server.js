@@ -8,16 +8,24 @@ const configManager = require('./config/configManager');
 const authPlugin = require('./plugins/auth');
 const adminRoutes = require('./routes/admin');
 const dynamicRoutes = require('./routes/dynamic');
+const certificates = require('./utils/certificates');
 
-async function buildServer() {
+async function buildServer(httpsOptions = null) {
   const config = configManager.load();
   
-  const fastify = Fastify({
+  const fastifyOptions = {
     logger: {
       level: config.logLevel || 'info'
     },
     bodyLimit: 50 * 1024 * 1024 // 50MB for binary uploads
-  });
+  };
+  
+  // Add HTTPS if configured
+  if (httpsOptions) {
+    fastifyOptions.https = httpsOptions;
+  }
+  
+  const fastify = Fastify(fastifyOptions);
 
   // Register multipart for file uploads
   await fastify.register(require('@fastify/multipart'), {
@@ -70,19 +78,40 @@ async function start() {
   const port = process.env.PORT || config.port || 4242;
   process.env.PORT = port; // Ensure it's set for other modules
   
+  // Determine protocol mode: env var > config file > default (https)
+  const useHttps = process.env.USE_HTTPS !== 'false' && (config.tls?.enabled !== false);
+  const useCustomCerts = config.tls?.useCustom || false;
+  
+  // Get HTTPS options if enabled
+  let httpsOptions = null;
+  let protocol = 'http';
+  
+  if (useHttps) {
+    const certs = certificates.getCertificates(useCustomCerts);
+    if (certs) {
+      httpsOptions = certs;
+      protocol = 'https';
+    } else {
+      console.log('⚠️  Could not load certificates, falling back to HTTP');
+    }
+  }
+  
   // Check if setup is needed
   if (!config.adminPasswordHash) {
     console.log('\n🐧 RoarinAPI Service - First Launch Setup Required');
-    console.log(`Access the admin panel at http://localhost:${port}/admin`);
+    console.log(`Access the admin panel at ${protocol}://localhost:${port}/admin`);
     console.log('You will be prompted to set an admin password.\n');
   }
 
-  const server = await buildServer();
+  const server = await buildServer(httpsOptions);
   
   try {
     const host = process.env.HOST || '0.0.0.0';
     await server.listen({ port: parseInt(port), host });
-    console.log(`🐧 RoarinAPI Service running on http://${host}:${port}`);
+    console.log(`🐧 RoarinAPI Service running on ${protocol}://${host}:${port}`);
+    if (protocol === 'https') {
+      console.log(`🔐 TLS enabled (${useCustomCerts ? 'custom' : 'self-signed'} certificates)`);
+    }
   } catch (err) {
     server.log.error(err);
     process.exit(1);
