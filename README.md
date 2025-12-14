@@ -22,7 +22,7 @@ A dynamic, configurable API mock service with a web-based admin UI. Built with *
 docker-compose up -d
 
 # Access admin UI
-open http://localhost:4242/admin/
+open http://localhost:4242/admin
 ```
 
 ### Local Development
@@ -38,7 +38,7 @@ npm run dev
 npm start
 
 # Access admin UI
-open http://localhost:4242/admin/
+open http://localhost:4242/admin
 ```
 
 ## 🔐 First Launch
@@ -106,8 +106,8 @@ Configure via Admin UI → Scalability tab:
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Health check for load balancers |
-| GET | `/admin/` | Admin UI |
-| ALL | `/api/admin/*` | Admin API (authenticated) |
+| GET | `/admin` | Admin UI |
+| ALL | `/api/admin*` | Admin API (authenticated) |
 
 ### Dynamic Endpoints
 

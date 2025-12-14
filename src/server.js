@@ -29,7 +29,12 @@ async function buildServer() {
   // Register static file serving for admin UI
   await fastify.register(require('@fastify/static'), {
     root: path.join(__dirname, 'public'),
-    prefix: '/admin/'
+    prefix: '/admin'
+  });
+  
+  // Handle /admin without trailing slash
+  fastify.get('/admin', async (request, reply) => {
+    return reply.sendFile('index.html');
   });
 
   // Register cookie support for session
@@ -52,7 +57,7 @@ async function buildServer() {
 
   // Root redirect to admin
   fastify.get('/', async (request, reply) => {
-    return reply.redirect('/admin/');
+    return reply.redirect('/admin');
   });
 
   return fastify;
@@ -68,7 +73,7 @@ async function start() {
   // Check if setup is needed
   if (!config.adminPasswordHash) {
     console.log('\n🐧 RoarinAPI Service - First Launch Setup Required');
-    console.log(`Access the admin panel at http://localhost:${port}/admin/`);
+    console.log(`Access the admin panel at http://localhost:${port}/admin`);
     console.log('You will be prompted to set an admin password.\n');
   }
 
