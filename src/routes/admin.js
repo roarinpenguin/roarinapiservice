@@ -306,8 +306,8 @@ async function adminRoutes(fastify, options) {
   fastify.post('/server-config', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
     const { port } = request.body;
     
-    if (!port || port < 1024 || port > 65535) {
-      return reply.code(400).send({ error: 'Port must be between 1024 and 65535' });
+    if (!port || port < 1 || port > 65535) {
+      return reply.code(400).send({ error: 'Port must be between 1 and 65535' });
     }
     
     const config = configManager.load();
