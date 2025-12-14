@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RoarinAPI Admin</title>
+  <script src="https://unpkg.com/alpinejs@3.13.3/dist/cdn.min.js" defer></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --purple-50: #faf5ff; --purple-100: #f3e8ff; --purple-200: #e9d5ff;
+      --purple-300: #d8b4fe; --purple-400: #c084fc; --purple-500: #a855f7;
+      --purple-600: #9333ea; --purple-700: #7c3aed; --purple-800: #6b21a8; --purple-900: #581c87;
+      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+      --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280;
+      --gray-600: #4b5563; --gray-700: #374151; --gray-800: #1f2937; --gray-900: #111827;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, var(--purple-50) 0%, #fff 50%, var(--purple-100) 100%); min-height: 100vh; color: var(--gray-800); display: flex; flex-direction: column; }
+    .navbar { background: linear-gradient(135deg, var(--purple-600) 0%, var(--purple-800) 100%); padding: 0.75rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 20px rgba(124, 58, 237, 0.3); }
+    .nav-brand { display: flex; align-items: center; gap: 0.5rem; color: white; font-size: 1.35rem; font-weight: 700; text-decoration: none; }
+    .nav-brand .penguin { font-size: 1.75rem; }
+    .nav-links { display: flex; gap: 0.25rem; }
+    .nav-link { color: rgba(255,255,255,0.85); text-decoration: none; padding: 0.5rem 1rem; border-radius: 8px; transition: all 0.2s; font-weight: 500; font-size: 0.95rem; cursor: pointer; }
+    .nav-link:hover, .nav-link.active { background: rgba(255,255,255,0.2); color: white; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; flex: 1; }
+    .card { background: white; border-radius: 16px; padding: 1.5rem; box-shadow: 0 4px 20px rgba(124, 58, 237, 0.08); border: 1px solid var(--purple-100); margin-bottom: 1.5rem; }
+    .card-title { font-size: 1.1rem; font-weight: 600; color: var(--purple-800); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.7rem 1.4rem; border-radius: 10px; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: all 0.2s; border: none; text-decoration: none; }
+    .btn-primary { background: linear-gradient(135deg, var(--purple-500) 0%, var(--purple-700) 100%); color: white; box-shadow: 0 4px 15px rgba(147, 51, 234, 0.3); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(147, 51, 234, 0.4); }
+    .btn-secondary { background: var(--gray-100); color: var(--gray-700); }
+    .btn-secondary:hover { background: var(--gray-200); }
+    .btn-danger { background: #fee2e2; color: #dc2626; }
+    .btn-sm { padding: 0.4rem 0.8rem; font-size: 0.8rem; }
+    .form-group { margin-bottom: 1rem; }
+    .form-label { display: block; margin-bottom: 0.4rem; font-weight: 500; color: var(--gray-700); font-size: 0.9rem; }
+    .form-input, .form-select, .form-textarea { width: 100%; padding: 0.7rem 1rem; border: 2px solid var(--gray-200); border-radius: 10px; font-size: 0.95rem; transition: all 0.2s; background: white; }
+    .form-input:focus, .form-select:focus, .form-textarea:focus { outline: none; border-color: var(--purple-400); box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15); }
+    .form-textarea { min-height: 100px; font-family: 'Monaco', 'Menlo', 'Consolas', monospace; font-size: 0.85rem; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .checkbox-wrap { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+    .checkbox-wrap input { width: 18px; height: 18px; accent-color: var(--purple-600); }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+    @media (max-width: 768px) { .grid-3, .grid-2, .form-row { grid-template-columns: 1fr; } }
+    .stat-card { background: linear-gradient(135deg, var(--purple-500) 0%, var(--purple-700) 100%); color: white; border-radius: 16px; padding: 1.25rem; text-align: center; box-shadow: 0 4px 15px rgba(147, 51, 234, 0.25); }
+    .stat-value { font-size: 2rem; font-weight: 700; }
+    .stat-label { opacity: 0.9; font-size: 0.85rem; margin-top: 0.25rem; }
+    .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }
+    .badge-get { background: #d1fae5; color: #065f46; }
+    .badge-post { background: #dbeafe; color: #1e40af; }
+    .badge-put { background: #fef3c7; color: #92400e; }
+    .badge-delete { background: #fee2e2; color: #991b1b; }
+    .badge-any { background: var(--purple-100); color: var(--purple-700); }
+    .badge-protected { background: #fef3c7; color: #92400e; }
+    .badge-disabled { background: var(--gray-200); color: var(--gray-500); }
+    .endpoint-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.9rem 1rem; border-radius: 10px; background: var(--gray-50); margin-bottom: 0.6rem; transition: all 0.2s; }
+    .endpoint-item:hover { background: var(--purple-50); border-left: 3px solid var(--purple-500); }
+    .endpoint-path { flex: 1; font-family: 'Monaco', 'Menlo', monospace; font-weight: 500; color: var(--purple-700); font-size: 0.95rem; }
+    .endpoint-badges { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .endpoint-actions { display: flex; gap: 0.4rem; }
+    .alert { padding: 0.9rem 1rem; border-radius: 10px; margin-bottom: 1rem; font-weight: 500; font-size: 0.9rem; }
+    .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .alert-success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(88, 28, 135, 0.4); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); }
+    .modal { background: white; border-radius: 20px; padding: 1.75rem; max-width: 650px; width: 95%; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px rgba(88, 28, 135, 0.3); }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 2px solid var(--purple-100); }
+    .modal-title { font-size: 1.25rem; font-weight: 700; color: var(--purple-800); }
+    .modal-close { width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--gray-100); cursor: pointer; font-size: 1.1rem; }
+    .auth-container { max-width: 460px; margin: 2rem auto; }
+    .auth-card { background: white; border-radius: 24px; padding: 2rem; box-shadow: 0 20px 60px rgba(124, 58, 237, 0.2); border: 2px solid var(--purple-100); }
+    .auth-header { text-align: center; margin-bottom: 1.5rem; }
+    .ascii-art { font-family: 'Monaco', 'Menlo', 'Consolas', monospace; font-size: 0.55rem; line-height: 1.1; color: var(--purple-700); white-space: pre; margin-bottom: 0.5rem; display: inline-block; background: var(--purple-50); padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid var(--purple-200); }
+    .ascii-title { font-family: 'Monaco', 'Menlo', 'Consolas', monospace; font-size: 0.45rem; line-height: 1.15; color: var(--purple-600); white-space: pre; margin-bottom: 0.5rem; background: var(--purple-100); padding: 0.5rem 0.75rem; border-radius: 10px; display: inline-block; }
+    .auth-subtitle { color: var(--gray-500); margin-top: 0.5rem; font-size: 0.95rem; }
+    .resource-bar { height: 8px; background: var(--gray-200); border-radius: 4px; overflow: hidden; margin: 0.5rem 0; }
+    .resource-fill { height: 100%; background: linear-gradient(90deg, var(--purple-400) 0%, var(--purple-600) 100%); border-radius: 4px; transition: width 0.3s; }
+    .response-item { background: var(--purple-50); border: 1px solid var(--purple-200); border-radius: 12px; padding: 1rem; margin-bottom: 0.75rem; }
+    .param-item { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; background: var(--gray-50); padding: 0.5rem; border-radius: 8px; }
+    .footer { text-align: center; padding: 1.5rem; color: var(--gray-500); font-size: 0.9rem; }
+    .footer .heart { color: var(--purple-500); }
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .page-title { font-size: 1.75rem; font-weight: 700; color: var(--purple-900); }
+    .slider-wrap { margin-bottom: 1.25rem; }
+    .slider-header { display: flex; justify-content: space-between; margin-bottom: 0.3rem; font-size: 0.9rem; }
+    .slider-value { font-weight: 600; color: var(--purple-600); }
+    input[type="range"] { width: 100%; height: 6px; appearance: none; background: var(--purple-200); border-radius: 3px; }
+    input[type="range"]::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; background: var(--purple-600); border-radius: 50%; cursor: pointer; box-shadow: 0 2px 6px rgba(147, 51, 234, 0.4); }
+    .empty-state { text-align: center; padding: 2rem; color: var(--gray-400); }
+    .empty-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+    pre { background: var(--gray-800); color: #e5e7eb; padding: 1rem; border-radius: 10px; overflow-x: auto; font-size: 0.8rem; margin-top: 1rem; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body x-data="app()" x-init="init()">
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <a href="#" class="nav-brand"><span class="penguin">🐧</span> RoarinAPI</a>
+    <div class="nav-links" x-show="authenticated">
+      <span class="nav-link" :class="{ active: tab === 'dashboard' }" @click="tab = 'dashboard'">Dashboard</span>
+      <span class="nav-link" :class="{ active: tab === 'endpoints' }" @click="tab = 'endpoints'">Endpoints</span>
+      <span class="nav-link" :class="{ active: tab === 'scalability' }" @click="tab = 'scalability'">Scalability</span>
+      <span class="nav-link" :class="{ active: tab === 'settings' }" @click="tab = 'settings'">Settings</span>
+      <span class="nav-link" @click="logout()">Logout</span>
+    </div>
+  </nav>
+
+  <div class="container">
+
+    <!-- SETUP SCREEN -->
+    <div x-show="needsSetup" class="auth-container">
+      <div class="auth-card">
+        <div class="auth-header">
+<pre class="ascii-art">
+       .--.
+      |o_o |
+      |:_/ |
+     //   \ \
+    (|     | )
+   /'\_   _/`\
+   \___)=(___/
+</pre>
+<pre class="ascii-title">
+ ____                   _            _    ____ ___ 
+|  _ \ ___   __ _ _ __ (_)_ __      / \  |  _ \_ _|
+| |_) / _ \ / _` | '__|| | '_ \    / _ \ | |_) | | 
+|  _ < (_) | (_| | |   | | | | |  / ___ \|  __/| | 
+|_| \_\___/ \__,_|_|   |_|_| |_| /_/   \_\_|  |___|
+     ____                  _            _       _           _       
+    / ___|  ___ _ ____   _(_) ___ ___  / \   __| |_ __ ___ (_)_ __  
+    \___ \ / _ \ '__\ \ / / |/ __/ _ \/ _ \ / _` | '_ ` _ \| | '_ \ 
+     ___) |  __/ |   \ V /| | (_|  __/ ___ \ (_| | | | | | | | | | |
+    |____/ \___|_|    \_/ |_|\___\___/_/   \_\__,_|_| |_| |_|_|_| |_|
+</pre>
+          <p class="auth-subtitle">Create your admin password to get started</p>
+        </div>
+        <div x-show="error" class="alert alert-error" x-text="error"></div>
+        <form @submit.prevent="setup()">
+          <div class="form-group">
+            <label class="form-label">Admin Password (min 8 chars)</label>
+            <input type="password" class="form-input" x-model="password" required minlength="8" placeholder="Enter secure password">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirm Password</label>
+            <input type="password" class="form-input" x-model="confirmPassword" required placeholder="Confirm password">
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%" :disabled="loading">
+            <span x-text="loading ? 'Creating...' : '🚀 Create Admin Account'"></span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- LOGIN SCREEN -->
+    <div x-show="!needsSetup && !authenticated" class="auth-container">
+      <div class="auth-card">
+        <div class="auth-header">
+<pre class="ascii-art">
+       .--.
+      |o_o |
+      |:_/ |
+     //   \ \
+    (|     | )
+   /'\_   _/`\
+   \___)=(___/
+</pre>
+<pre class="ascii-title">
+ ____                   _            _    ____ ___ 
+|  _ \ ___   __ _ _ __ (_)_ __      / \  |  _ \_ _|
+| |_) / _ \ / _` | '__|| | '_ \    / _ \ | |_) | | 
+|  _ < (_) | (_| | |   | | | | |  / ___ \|  __/| | 
+|_| \_\___/ \__,_|_|   |_|_| |_| /_/   \_\_|  |___|
+     ____                  _            _       _           _       
+    / ___|  ___ _ ____   _(_) ___ ___  / \   __| |_ __ ___ (_)_ __  
+    \___ \ / _ \ '__\ \ / / |/ __/ _ \/ _ \ / _` | '_ ` _ \| | '_ \ 
+     ___) |  __/ |   \ V /| | (_|  __/ ___ \ (_| | | | | | | | | | |
+    |____/ \___|_|    \_/ |_|\___\___/_/   \_\__,_|_| |_| |_|_|_| |_|
+</pre>
+          <p class="auth-subtitle">Enter your password to continue</p>
+        </div>
+        <div x-show="error" class="alert alert-error" x-text="error"></div>
+        <form @submit.prevent="login()">
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" class="form-input" x-model="password" required placeholder="Enter password">
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%" :disabled="loading">
+            <span x-text="loading ? 'Logging in...' : '🔐 Login'"></span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div x-show="authenticated && tab === 'dashboard'">
+      <div class="page-header">
+        <h1 class="page-title">📊 Dashboard</h1>
+      </div>
+      <div class="grid-3">
+        <div class="stat-card">
+          <div class="stat-value" x-text="systemInfo?.endpoints?.total || 0"></div>
+          <div class="stat-label">Total Endpoints</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" x-text="systemInfo?.endpoints?.enabled || 0"></div>
+          <div class="stat-label">Active Endpoints</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" x-text="systemInfo?.endpoints?.protected || 0"></div>
+          <div class="stat-label">Protected</div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">💾 Memory Usage</div>
+          <div class="resource-bar">
+            <div class="resource-fill" :style="`width: ${memPercent}%`"></div>
+          </div>
+          <small x-text="`${memUsed} MB / ${memTotal} MB (${memPercent}%)`"></small>
+        </div>
+        <div class="card">
+          <div class="card-title">⏱️ Uptime</div>
+          <div style="font-size: 1.5rem; font-weight: 700; color: var(--purple-600);" x-text="formatUptime(systemInfo?.uptime || 0)"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📈 Resource Estimates</div>
+        <div class="grid-3">
+          <div><strong>Memory:</strong> <span x-text="`${systemInfo?.resources?.memory?.estimated || 0} MB`"></span></div>
+          <div><strong>CPU:</strong> <span x-text="`${systemInfo?.resources?.cpu?.estimated || 0} cores`"></span></div>
+          <div><strong>Throughput:</strong> <span x-text="`~${systemInfo?.resources?.throughput?.estimated || 0} req/s`"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ENDPOINTS -->
+    <div x-show="authenticated && tab === 'endpoints'">
+      <div class="page-header">
+        <h1 class="page-title">🔌 API Endpoints</h1>
+        <button class="btn btn-primary" @click="openModal()">+ New Endpoint</button>
+      </div>
+      <div class="card">
+        <template x-if="endpoints.length === 0">
+          <div class="empty-state">
+            <div class="empty-icon">📭</div>
+            <p>No endpoints yet. Create your first one!</p>
+          </div>
+        </template>
+        <template x-for="ep in endpoints" :key="ep.id">
+          <div class="endpoint-item">
+            <span class="badge" :class="'badge-' + ep.method.toLowerCase()" x-text="ep.method"></span>
+            <span class="endpoint-path" x-text="ep.path"></span>
+            <div class="endpoint-badges">
+              <span x-show="ep.protected" class="badge badge-protected">🔒</span>
+              <span x-show="!ep.enabled" class="badge badge-disabled">OFF</span>
+            </div>
+            <div class="endpoint-actions">
+              <button class="btn btn-secondary btn-sm" @click="editEndpoint(ep)">Edit</button>
+              <button class="btn btn-danger btn-sm" @click="deleteEndpoint(ep.id)">Delete</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- SCALABILITY -->
+    <div x-show="authenticated && tab === 'scalability'">
+      <div class="page-header">
+        <h1 class="page-title">⚡ Scalability</h1>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">👷 Workers</div>
+          <div class="slider-wrap">
+            <div class="slider-header">
+              <span>Number of Workers</span>
+              <span class="slider-value" x-text="scalability.workers"></span>
+            </div>
+            <input type="range" min="1" max="16" x-model="scalability.workers" @change="updateScalability()">
+            <small>Each worker handles requests independently</small>
+          </div>
+          <div class="slider-wrap">
+            <div class="slider-header">
+              <span>Max Connections</span>
+              <span class="slider-value" x-text="scalability.maxConnections"></span>
+            </div>
+            <input type="range" min="100" max="10000" step="100" x-model="scalability.maxConnections" @change="updateScalability()">
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">⏳ Timeouts</div>
+          <div class="form-group">
+            <label class="form-label">Connection Timeout (ms)</label>
+            <input type="number" class="form-input" x-model="scalability.connectionTimeout" @change="updateScalability()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Keep-Alive Timeout (ms)</label>
+            <input type="number" class="form-input" x-model="scalability.keepAliveTimeout" @change="updateScalability()">
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 Resource Impact</div>
+        <div class="grid-3">
+          <div class="stat-card">
+            <div class="stat-value" x-text="resources?.memory?.estimated || 0"></div>
+            <div class="stat-label">Est. Memory (MB)</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" x-text="resources?.cpu?.estimated || 0"></div>
+            <div class="stat-label">Est. CPU (cores)</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" x-text="'~' + (resources?.throughput?.estimated || 0)"></div>
+            <div class="stat-label">Throughput (req/s)</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">🔧 NGINX Config</div>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+          <button class="btn btn-secondary btn-sm" @click="downloadNginx()">Download nginx.conf</button>
+          <button class="btn btn-secondary btn-sm" @click="showNginx = !showNginx" x-text="showNginx ? 'Hide' : 'Preview'"></button>
+          <button class="btn btn-primary btn-sm" @click="reloadNginx()">🔄 Reload NGINX</button>
+        </div>
+        <div x-show="nginxMsg" class="alert" :class="nginxErr ? 'alert-error' : 'alert-success'" x-text="nginxMsg"></div>
+        <pre x-show="showNginx" x-text="nginxConfig"></pre>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div x-show="authenticated && tab === 'settings'">
+      <div class="page-header">
+        <h1 class="page-title">⚙️ Settings</h1>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">🔐 Change Password</div>
+          <div x-show="settingsMsg" class="alert" :class="settingsErr ? 'alert-error' : 'alert-success'" x-text="settingsMsg"></div>
+          <form @submit.prevent="changePassword()">
+            <div class="form-group">
+              <label class="form-label">Current Password</label>
+              <input type="password" class="form-input" x-model="curPwd" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">New Password</label>
+              <input type="password" class="form-input" x-model="newPwd" required minlength="8">
+            </div>
+            <button type="submit" class="btn btn-primary">Update Password</button>
+          </form>
+        </div>
+        <div class="card">
+          <div class="card-title">📦 Export / Import</div>
+          <p style="margin-bottom: 1rem; color: var(--gray-600);">Backup or restore your entire configuration.</p>
+          <button class="btn btn-primary" @click="exportCfg()" style="margin-bottom: 1rem;">📤 Export Config</button>
+          <div class="form-group">
+            <label class="form-label">Import Configuration</label>
+            <input type="file" class="form-input" accept=".json" @change="importCfg($event)">
+          </div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top: 1.5rem;">
+        <div class="card">
+          <div class="card-title">🌐 Server Port</div>
+          <div x-show="portMsg" class="alert" :class="portErr ? 'alert-error' : 'alert-success'" x-text="portMsg"></div>
+          <div class="form-group">
+            <label class="form-label">Current Port: <strong x-text="currentPort"></strong></label>
+            <input type="number" class="form-input" x-model="newPort" min="1024" max="65535" placeholder="4242">
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-primary" @click="changePort()">Save Port</button>
+            <button class="btn btn-danger" @click="restartServer()" x-show="portChanged">🔄 Restart Server</button>
+          </div>
+          <small style="display: block; margin-top: 0.5rem; color: var(--gray-500);">Server restart required after port change</small>
+        </div>
+        <div class="card">
+          <div class="card-title">🖥️ Server Control</div>
+          <p style="margin-bottom: 1rem; color: var(--gray-600);">Restart the server to apply configuration changes.</p>
+          <button class="btn btn-danger" @click="restartServer()">🔄 Restart Server</button>
+          <small style="display: block; margin-top: 0.5rem; color: var(--gray-500);">Warning: You will be disconnected briefly</small>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ENDPOINT MODAL -->
+  <div x-show="modal" class="modal-backdrop" @click.self="modal = false">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" x-text="editing ? 'Edit Endpoint' : 'New Endpoint'"></h2>
+        <button class="modal-close" @click="modal = false">×</button>
+      </div>
+      <form @submit.prevent="saveEndpoint()">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Method</label>
+            <select class="form-select" x-model="form.method">
+              <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option><option>PATCH</option><option>ANY</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Path</label>
+            <input type="text" class="form-input" x-model="form.path" required placeholder="/api/example">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <input type="text" class="form-input" x-model="form.description" placeholder="What this endpoint does">
+        </div>
+        <div class="form-row" style="margin-bottom: 1rem;">
+          <label class="checkbox-wrap"><input type="checkbox" x-model="form.protected"> Protected (token required)</label>
+          <label class="checkbox-wrap"><input type="checkbox" x-model="form.enabled"> Enabled</label>
+        </div>
+        <div class="form-group" x-show="form.protected">
+          <label class="form-label">Bearer Token</label>
+          <input type="text" class="form-input" x-model="form.token" placeholder="secret-token">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Parameter Source</label>
+          <select class="form-select" x-model="form.parameterSource">
+            <option value="none">None</option>
+            <option value="query">Query String</option>
+            <option value="header">Headers</option>
+            <option value="body">Body</option>
+            <option value="mixed">Mixed</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Response Type</label>
+          <select class="form-select" x-model="form.responseType">
+            <option value="json">JSON</option>
+            <option value="text">Text</option>
+            <option value="binary">Binary</option>
+            <option value="redirect">Redirect</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">JSON Response</label>
+          <textarea class="form-textarea" x-model="form.responseJson" placeholder='{"message": "Hello"}'></textarea>
+        </div>
+        <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1rem;">
+          <button type="button" class="btn btn-secondary" @click="modal = false">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Endpoint</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer class="footer">Created with <span class="heart">💜</span> by the RoarinPenguin</footer>
+
+  <script>
+    function app() {
+      return {
+        needsSetup: true, authenticated: false, loading: false, error: '', password: '', confirmPassword: '',
+        tab: 'dashboard', endpoints: [], systemInfo: null, modal: false, editing: null,
+        scalability: { workers: 1, maxConnections: 1000, connectionTimeout: 30000, keepAliveTimeout: 5000 },
+        resources: null, nginxConfig: '', showNginx: false, nginxMsg: '', nginxErr: false,
+        curPwd: '', newPwd: '', settingsMsg: '', settingsErr: false,
+        currentPort: 4242, newPort: 4242, portMsg: '', portErr: false, portChanged: false,
+        form: { method: 'GET', path: '/', description: '', protected: false, token: '', parameterSource: 'none', responseType: 'json', responseJson: '{}', enabled: true },
+
+        get memUsed() { return Math.round((this.systemInfo?.memory?.heapUsed || 0) / 1024 / 1024); },
+        get memTotal() { return Math.round((this.systemInfo?.memory?.heapTotal || 0) / 1024 / 1024); },
+        get memPercent() { return this.memTotal ? Math.round((this.memUsed / this.memTotal) * 100) : 0; },
+
+        async init() {
+          try {
+            const r = await fetch('/api/admin/setup-status');
+            const d = await r.json();
+            this.needsSetup = !d.setupComplete;
+            this.authenticated = d.authenticated;
+            if (this.authenticated) await this.loadAll();
+          } catch (e) { this.error = 'Failed to connect'; }
+        },
+
+        async setup() {
+          if (this.password !== this.confirmPassword) { this.error = 'Passwords do not match'; return; }
+          this.loading = true; this.error = '';
+          try {
+            const r = await fetch('/api/admin/setup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: this.password }) });
+            if (r.ok) { this.needsSetup = false; this.authenticated = true; await this.loadAll(); }
+            else { const d = await r.json(); this.error = d.error; }
+          } catch (e) { this.error = 'Setup failed'; }
+          this.loading = false; this.password = ''; this.confirmPassword = '';
+        },
+
+        async login() {
+          this.loading = true; this.error = '';
+          try {
+            const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: this.password }) });
+            if (r.ok) { this.authenticated = true; await this.loadAll(); }
+            else { const d = await r.json(); this.error = d.error; }
+          } catch (e) { this.error = 'Login failed'; }
+          this.loading = false; this.password = '';
+        },
+
+        async logout() {
+          await fetch('/api/admin/logout', { method: 'POST' });
+          this.authenticated = false;
+        },
+
+        async loadAll() {
+          await Promise.all([this.loadEndpoints(), this.loadSystem(), this.loadScalability()]);
+        },
+
+        async loadEndpoints() {
+          try { const r = await fetch('/api/admin/endpoints'); const d = await r.json(); this.endpoints = d.endpoints || []; } catch (e) {}
+        },
+
+        async loadSystem() {
+          try { 
+            const r = await fetch('/api/admin/system-info'); 
+            this.systemInfo = await r.json();
+            this.currentPort = this.systemInfo.port || 4242;
+            this.newPort = this.currentPort;
+          } catch (e) {}
+        },
+
+        async loadScalability() {
+          try {
+            const r = await fetch('/api/admin/scalability'); const d = await r.json();
+            this.scalability = d.scalability; this.resources = d.resources;
+            const n = await fetch('/api/admin/nginx-config'); const nd = await n.json(); this.nginxConfig = nd.config;
+          } catch (e) {}
+        },
+
+        async updateScalability() {
+          try {
+            const r = await fetch('/api/admin/scalability', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.scalability) });
+            const d = await r.json(); this.resources = d.resources;
+            const n = await fetch('/api/admin/nginx-config'); const nd = await n.json(); this.nginxConfig = nd.config;
+          } catch (e) {}
+        },
+
+        openModal() {
+          this.editing = null;
+          this.form = { method: 'GET', path: '/', description: '', protected: false, token: '', parameterSource: 'none', responseType: 'json', responseJson: '{}', enabled: true };
+          this.modal = true;
+        },
+
+        editEndpoint(ep) {
+          this.editing = ep;
+          this.form = { ...ep, responseJson: JSON.stringify(ep.responses?.[0]?.data || {}, null, 2) };
+          this.modal = true;
+        },
+
+        async saveEndpoint() {
+          let data;
+          try { data = JSON.parse(this.form.responseJson); } catch { data = {}; }
+          const payload = { ...this.form, responses: [{ condition: null, data }] };
+          const url = this.editing ? `/api/admin/endpoints/${this.editing.id}` : '/api/admin/endpoints';
+          const method = this.editing ? 'PUT' : 'POST';
+          try {
+            await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            this.modal = false; await this.loadEndpoints(); await this.loadSystem();
+          } catch (e) {}
+        },
+
+        async deleteEndpoint(id) {
+          if (!confirm('Delete this endpoint?')) return;
+          await fetch(`/api/admin/endpoints/${id}`, { method: 'DELETE' });
+          await this.loadEndpoints(); await this.loadSystem();
+        },
+
+        async changePassword() {
+          this.settingsMsg = '';
+          try {
+            const r = await fetch('/api/admin/change-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword: this.curPwd, newPassword: this.newPwd }) });
+            const d = await r.json();
+            if (r.ok) { this.settingsErr = false; this.settingsMsg = 'Password changed! Please login again.'; this.authenticated = false; }
+            else { this.settingsErr = true; this.settingsMsg = d.error; }
+          } catch (e) { this.settingsErr = true; this.settingsMsg = 'Failed'; }
+          this.curPwd = ''; this.newPwd = '';
+        },
+
+        async exportCfg() {
+          const r = await fetch('/api/admin/export'); const d = await r.json();
+          const blob = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' });
+          const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'roarinapi-config.json'; a.click();
+        },
+
+        async importCfg(e) {
+          const file = e.target.files[0]; if (!file) return;
+          const text = await file.text();
+          try {
+            const data = JSON.parse(text);
+            const r = await fetch('/api/admin/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+            if (r.ok) { alert('Imported!'); await this.loadAll(); }
+            else { const d = await r.json(); alert('Error: ' + d.error); }
+          } catch { alert('Invalid JSON'); }
+          e.target.value = '';
+        },
+
+        downloadNginx() {
+          const blob = new Blob([this.nginxConfig], { type: 'text/plain' });
+          const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'nginx.conf'; a.click();
+        },
+
+        async reloadNginx() {
+          this.nginxMsg = ''; this.nginxErr = false;
+          try {
+            const r = await fetch('/api/admin/nginx-reload', { method: 'POST' });
+            const d = await r.json();
+            if (d.success) { this.nginxErr = false; this.nginxMsg = d.message; }
+            else { this.nginxErr = true; this.nginxMsg = d.error + (d.hint ? ' ' + d.hint : ''); }
+          } catch (e) { this.nginxErr = true; this.nginxMsg = 'Failed to reload NGINX'; }
+        },
+
+        async changePort() {
+          this.portMsg = ''; this.portErr = false;
+          if (this.newPort < 1024 || this.newPort > 65535) {
+            this.portErr = true; this.portMsg = 'Port must be between 1024 and 65535'; return;
+          }
+          try {
+            const r = await fetch('/api/admin/server-config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ port: this.newPort }) });
+            const d = await r.json();
+            if (d.success) { this.portErr = false; this.portMsg = d.message; this.portChanged = true; }
+            else { this.portErr = true; this.portMsg = d.error; }
+          } catch (e) { this.portErr = true; this.portMsg = 'Failed to save port'; }
+        },
+
+        async restartServer() {
+          if (!confirm('Restart the server? You will be disconnected briefly.')) return;
+          try {
+            await fetch('/api/admin/server-restart', { method: 'POST' });
+            this.portMsg = 'Server restarting... Reconnecting in 3 seconds...';
+            setTimeout(() => { window.location.reload(); }, 3000);
+          } catch (e) { }
+        },
+
+        formatUptime(s) {
+          const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+          if (d > 0) return `${d}d ${h}h ${m}m`;
+          if (h > 0) return `${h}h ${m}m`;
+          return `${m}m ${Math.floor(s % 60)}s`;
+        }
+      };
+    }
+  </script>
+</body>
+</html>

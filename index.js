@@ -5,7 +5,7 @@ const path = require('path');
 const app = express();
 app.use(express.json());
 
-const AUTH_TOKEN = process.env.AUTH_TOKEN || 'mysecrettoken';
+const AUTH_TOKEN = process.env.AUTH_TOKEN || 'let-th3PenguinR0ar!';
 
 // Middleware to check auth token
 function checkAuth(req, res, next) {
@@ -18,7 +18,7 @@ function checkAuth(req, res, next) {
 
 // Public ping
 app.get('/ping', (req, res) => {
-  res.json({ message: 'pong' });
+  res.json({ message: 'pong ZW5kcG9pbnQgaXMgL2Nhcmxpc3QsIHRva2VuIGlzIGxldC10aDNQZW5ndWluUjBhciEK' });
 });
 
 // Secure car list
