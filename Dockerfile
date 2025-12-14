@@ -43,9 +43,9 @@ ENV NODE_ENV=production \
 # Expose port
 EXPOSE 4242
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:4242/health || exit 1
+# Health check - try HTTPS first, fall back to HTTP, use configured port
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD wget --no-check-certificate --no-verbose --tries=1 --spider https://localhost:${PORT:-4242}/health 2>/dev/null || wget --no-verbose --tries=1 --spider http://localhost:${PORT:-4242}/health || exit 1
 
 # Switch to non-root user
 USER roarinapi
