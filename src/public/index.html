@@ -11,9 +11,29 @@
       --purple-50: #faf5ff; --purple-100: #f3e8ff; --purple-200: #e9d5ff;
       --purple-300: #d8b4fe; --purple-400: #c084fc; --purple-500: #a855f7;
       --purple-600: #9333ea; --purple-700: #7c3aed; --purple-800: #6b21a8; --purple-900: #581c87;
+      --blue-50: #eff6ff; --blue-100: #dbeafe; --blue-200: #bfdbfe;
+      --blue-300: #93c5fd; --blue-400: #60a5fa; --blue-500: #3b82f6;
+      --blue-600: #2563eb; --blue-700: #1d4ed8; --blue-800: #1e40af; --blue-900: #1e3a8a;
+      --green-50: #f0fdf4; --green-100: #dcfce7; --green-200: #bbf7d0;
+      --green-300: #86efac; --green-400: #4ade80; --green-500: #22c55e;
+      --green-600: #16a34a; --green-700: #15803d; --green-800: #166534; --green-900: #14532d;
+      --red-50: #fef2f2; --red-100: #fee2e2; --red-200: #fecaca;
+      --red-300: #fca5a5; --red-400: #f87171; --red-500: #ef4444;
+      --red-600: #dc2626; --red-700: #b91c1c; --red-800: #991b1b; --red-900: #7f1d1d;
+      --orange-50: #fff7ed; --orange-100: #ffedd5; --orange-200: #fed7aa;
+      --orange-300: #fdba74; --orange-400: #fb923c; --orange-500: #f97316;
+      --orange-600: #ea580c; --orange-700: #c2410c; --orange-800: #9a3412; --orange-900: #7c2d12;
+      --slate-50: #f8fafc; --slate-100: #f1f5f9; --slate-200: #e2e8f0;
+      --slate-300: #cbd5e1; --slate-400: #94a3b8; --slate-500: #64748b;
+      --slate-600: #475569; --slate-700: #334155; --slate-800: #1e293b; --slate-900: #0f172a;
       --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
       --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280;
       --gray-600: #4b5563; --gray-700: #374151; --gray-800: #1f2937; --gray-900: #111827;
+      /* Primary color aliases - default purple */
+      --primary-50: var(--purple-50); --primary-100: var(--purple-100); --primary-200: var(--purple-200);
+      --primary-300: var(--purple-300); --primary-400: var(--purple-400); --primary-500: var(--purple-500);
+      --primary-600: var(--purple-600); --primary-700: var(--purple-700); --primary-800: var(--purple-800); --primary-900: var(--purple-900);
+      --primary-rgb: 124, 58, 237;
     }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, var(--purple-50) 0%, #fff 50%, var(--purple-100) 100%); min-height: 100vh; color: var(--gray-800); display: flex; flex-direction: column; }
     .navbar { background: linear-gradient(135deg, var(--purple-600) 0%, var(--purple-800) 100%); padding: 0.75rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 20px rgba(124, 58, 237, 0.3); }
@@ -68,10 +88,11 @@
     .modal-title { font-size: 1.25rem; font-weight: 700; color: var(--purple-800); }
     .modal-close { width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--gray-100); cursor: pointer; font-size: 1.1rem; }
     .auth-container { max-width: 460px; margin: 2rem auto; }
-    .auth-card { background: white; border-radius: 24px; padding: 2rem; box-shadow: 0 20px 60px rgba(124, 58, 237, 0.2); border: 2px solid var(--purple-100); }
+    .auth-card { background: white; border-radius: 24px; padding: 2rem; box-shadow: 0 20px 60px rgba(var(--primary-rgb), 0.2); border: 2px solid var(--primary-100); }
     .auth-header { text-align: center; margin-bottom: 1.5rem; }
-    .ascii-art { font-family: 'Monaco', 'Menlo', 'Consolas', monospace; font-size: 0.55rem; line-height: 1.1; color: var(--purple-700); white-space: pre; margin-bottom: 0.5rem; display: inline-block; background: var(--purple-50); padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid var(--purple-200); }
-    .ascii-title { font-family: 'Monaco', 'Menlo', 'Consolas', monospace; font-size: 0.45rem; line-height: 1.15; color: var(--purple-600); white-space: pre; margin-bottom: 0.5rem; background: var(--purple-100); padding: 0.5rem 0.75rem; border-radius: 10px; display: inline-block; }
+    .auth-banner { max-width: 100%; max-height: 120px; object-fit: contain; margin-bottom: 1rem; border-radius: 12px; }
+    .auth-logo { font-size: 4rem; margin-bottom: 0.5rem; }
+    .auth-title { font-size: 1.5rem; font-weight: 700; color: var(--primary-700); margin-bottom: 0.25rem; }
     .auth-subtitle { color: var(--gray-500); margin-top: 0.5rem; font-size: 0.95rem; }
     .resource-bar { height: 8px; background: var(--gray-200); border-radius: 4px; overflow: hidden; margin: 0.5rem 0; }
     .resource-fill { height: 100%; background: linear-gradient(90deg, var(--purple-400) 0%, var(--purple-600) 100%); border-radius: 4px; transition: width 0.3s; }
@@ -79,6 +100,9 @@
     .param-item { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; background: var(--gray-50); padding: 0.5rem; border-radius: 8px; }
     .footer { text-align: center; padding: 1.5rem; color: var(--gray-500); font-size: 0.9rem; }
     .footer .heart { color: var(--purple-500); }
+    .color-swatch { width: 40px; height: 40px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; border: 3px solid transparent; transition: all 0.2s; }
+    .color-swatch:hover { transform: scale(1.1); }
+    .color-swatch.active { border-color: var(--gray-800); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
     .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
     .page-title { font-size: 1.75rem; font-weight: 700; color: var(--purple-900); }
     .slider-wrap { margin-bottom: 1.25rem; }
@@ -112,28 +136,10 @@
     <div x-show="needsSetup" class="auth-container">
       <div class="auth-card">
         <div class="auth-header">
-<pre class="ascii-art">
-       .--.
-      |o_o |
-      |:_/ |
-     //   \ \
-    (|     | )
-   /'\_   _/`\
-   \___)=(___/
-</pre>
-<pre class="ascii-title">
- ____                   _            _    ____ ___ 
-|  _ \ ___   __ _ _ __ (_)_ __      / \  |  _ \_ _|
-| |_) / _ \ / _` | '__|| | '_ \    / _ \ | |_) | | 
-|  _ < (_) | (_| | |   | | | | |  / ___ \|  __/| | 
-|_| \_\___/ \__,_|_|   |_|_| |_| /_/   \_\_|  |___|
-     ____                  _            _       _           _       
-    / ___|  ___ _ ____   _(_) ___ ___  / \   __| |_ __ ___ (_)_ __  
-    \___ \ / _ \ '__\ \ / / |/ __/ _ \/ _ \ / _` | '_ ` _ \| | '_ \ 
-     ___) |  __/ |   \ V /| | (_|  __/ ___ \ (_| | | | | | | | | | |
-    |____/ \___|_|    \_/ |_|\___\___/_/   \_\__,_|_| |_| |_|_|_| |_|
-</pre>
-          <p class="auth-subtitle">Create your admin password to get started</p>
+          <img x-show="theme.bannerUrl" :src="theme.bannerUrl" class="auth-banner" alt="Banner">
+          <div x-show="!theme.bannerUrl" class="auth-logo">🐧</div>
+          <h1 class="auth-title" x-text="theme.title"></h1>
+          <p class="auth-subtitle" x-text="theme.subtitle || 'Create your admin password to get started'"></p>
         </div>
         <div x-show="error" class="alert alert-error" x-text="error"></div>
         <form @submit.prevent="setup()">
@@ -156,27 +162,9 @@
     <div x-show="!needsSetup && !authenticated" class="auth-container">
       <div class="auth-card">
         <div class="auth-header">
-<pre class="ascii-art">
-       .--.
-      |o_o |
-      |:_/ |
-     //   \ \
-    (|     | )
-   /'\_   _/`\
-   \___)=(___/
-</pre>
-<pre class="ascii-title">
- ____                   _            _    ____ ___ 
-|  _ \ ___   __ _ _ __ (_)_ __      / \  |  _ \_ _|
-| |_) / _ \ / _` | '__|| | '_ \    / _ \ | |_) | | 
-|  _ < (_) | (_| | |   | | | | |  / ___ \|  __/| | 
-|_| \_\___/ \__,_|_|   |_|_| |_| /_/   \_\_|  |___|
-     ____                  _            _       _           _       
-    / ___|  ___ _ ____   _(_) ___ ___  / \   __| |_ __ ___ (_)_ __  
-    \___ \ / _ \ '__\ \ / / |/ __/ _ \/ _ \ / _` | '_ ` _ \| | '_ \ 
-     ___) |  __/ |   \ V /| | (_|  __/ ___ \ (_| | | | | | | | | | |
-    |____/ \___|_|    \_/ |_|\___\___/_/   \_\__,_|_| |_| |_|_|_| |_|
-</pre>
+          <img x-show="theme.bannerUrl" :src="theme.bannerUrl" class="auth-banner" alt="Banner">
+          <div x-show="!theme.bannerUrl" class="auth-logo">🐧</div>
+          <h1 class="auth-title" x-text="theme.title"></h1>
           <p class="auth-subtitle">Enter your password to continue</p>
         </div>
         <div x-show="error" class="alert alert-error" x-text="error"></div>
@@ -445,6 +433,46 @@
           <button class="btn btn-danger btn-sm" style="margin-left: 0.5rem;" @click="restartServer()">🔄 Restart Now</button>
         </div>
       </div>
+      
+      <!-- Theme Configuration -->
+      <div class="card" style="margin-top: 1.5rem;">
+        <div class="card-title">🎨 Theme Configuration</div>
+        <div x-show="themeMsg" class="alert" :class="themeErr ? 'alert-error' : 'alert-success'" x-text="themeMsg"></div>
+        
+        <div class="form-group">
+          <label class="form-label">Title</label>
+          <input type="text" class="form-input" x-model="theme.title" placeholder="RoarinAPI Service">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Subtitle</label>
+          <input type="text" class="form-input" x-model="theme.subtitle" placeholder="API Mock Service Admin">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Color Scheme</label>
+          <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
+            <template x-for="color in ['purple', 'blue', 'green', 'red', 'orange', 'slate']">
+              <label class="color-swatch" :class="{ 'active': theme.colorScheme === color }" :style="'background: var(--' + color + '-500)'">
+                <input type="radio" name="colorScheme" :value="color" x-model="theme.colorScheme" style="display: none;">
+                <span x-show="theme.colorScheme === color" style="color: white;">✓</span>
+              </label>
+            </template>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Banner Image</label>
+          <div x-show="theme.bannerUrl" style="margin-bottom: 0.5rem;">
+            <img :src="theme.bannerUrl" style="max-height: 80px; border-radius: 8px; border: 1px solid var(--gray-200);">
+            <button class="btn btn-danger btn-sm" style="margin-left: 0.5rem;" @click="theme.bannerUrl = ''; saveTheme()">🗑️ Remove</button>
+          </div>
+          <input type="file" class="form-input" accept="image/*" @change="handleBannerUpload($event)">
+          <small style="display: block; margin-top: 0.25rem; color: var(--gray-500);">Recommended: PNG or JPG, max height 120px</small>
+        </div>
+        
+        <button class="btn btn-primary" @click="saveTheme()">💾 Save Theme</button>
+      </div>
     </div>
 
   </div>
@@ -542,6 +570,8 @@
         currentPort: 4242, newPort: 4242, portMsg: '', portErr: false, portChanged: false,
         tls: { enabled: true, certType: 'selfsigned', selfSignedExists: false, customExists: false, customInfo: '' },
         tlsMsg: '', tlsErr: false, tlsChanged: false, tlsKeyData: null, tlsCertData: null,
+        theme: { title: 'RoarinAPI Service', subtitle: 'API Mock Service Admin', bannerUrl: '', colorScheme: 'purple' },
+        themeMsg: '', themeErr: false,
         form: { method: 'GET', path: '/', description: '', protected: false, token: '', parameterSource: 'none', responseType: 'json', responseJson: '{}', responseText: '', fileName: '', contentType: '', redirectUrl: '', fileData: null, enabled: true },
 
         get memUsed() { return Math.round((this.systemInfo?.memory?.heapUsed || 0) / 1024 / 1024); },
@@ -550,6 +580,8 @@
 
         async init() {
           try {
+            // Load theme first (public endpoint, needed for login/setup screens)
+            await this.loadTheme();
             const r = await fetch('/api/admin/setup-status');
             const d = await r.json();
             this.needsSetup = !d.setupComplete;
@@ -857,6 +889,72 @@
             }
             else { this.tlsErr = true; this.tlsMsg = d.error; }
           } catch (e) { this.tlsErr = true; this.tlsMsg = 'Failed to delete certificates'; }
+        },
+
+        async loadTheme() {
+          try {
+            const r = await fetch('/api/admin/theme');
+            if (!r.ok) return;
+            const d = await r.json();
+            this.theme = { ...this.theme, ...d.theme };
+            this.applyColorScheme(this.theme.colorScheme);
+          } catch (e) { console.error('loadTheme error:', e); }
+        },
+
+        applyColorScheme(scheme) {
+          const root = document.documentElement;
+          const colors = ['50', '100', '200', '300', '400', '500', '600', '700', '800', '900'];
+          const rgbMap = { purple: '124, 58, 237', blue: '37, 99, 235', green: '22, 163, 74', red: '220, 38, 38', orange: '234, 88, 12', slate: '71, 85, 105' };
+          colors.forEach(c => {
+            root.style.setProperty(`--primary-${c}`, `var(--${scheme}-${c})`);
+          });
+          root.style.setProperty('--primary-rgb', rgbMap[scheme] || rgbMap.purple);
+        },
+
+        async saveTheme() {
+          this.themeMsg = ''; this.themeErr = false;
+          try {
+            const r = await fetch('/api/admin/theme', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(this.theme)
+            });
+            const d = await r.json();
+            if (d.success) {
+              this.themeErr = false;
+              this.themeMsg = 'Theme saved successfully!';
+              this.applyColorScheme(this.theme.colorScheme);
+            } else {
+              this.themeErr = true;
+              this.themeMsg = d.error || 'Failed to save theme';
+            }
+          } catch (e) { this.themeErr = true; this.themeMsg = 'Failed to save theme'; }
+        },
+
+        async handleBannerUpload(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          this.themeMsg = ''; this.themeErr = false;
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            try {
+              const r = await fetch('/api/admin/theme/banner', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageData: ev.target.result })
+              });
+              const d = await r.json();
+              if (d.success) {
+                this.theme.bannerUrl = d.bannerUrl;
+                this.themeMsg = 'Banner uploaded!';
+              } else {
+                this.themeErr = true;
+                this.themeMsg = d.error || 'Failed to upload banner';
+              }
+            } catch (err) { this.themeErr = true; this.themeMsg = 'Failed to upload banner'; }
+          };
+          reader.readAsDataURL(file);
+          e.target.value = '';
         }
       };
     }

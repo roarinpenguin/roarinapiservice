@@ -469,6 +469,83 @@ async function adminRoutes(fastify, options) {
       return reply.code(500).send({ error: 'Failed to delete certificates' });
     }
   });
+  
+  // ===== THEME CONFIGURATION =====
+  
+  const defaultTheme = {
+    title: 'RoarinAPI Service',
+    subtitle: 'API Mock Service Admin',
+    bannerUrl: '',
+    colorScheme: 'purple', // purple, blue, green, red, orange, slate
+    customColors: null
+  };
+  
+  // Get theme (public - needed for login page)
+  fastify.get('/theme', async (request, reply) => {
+    const config = configManager.load();
+    return { theme: { ...defaultTheme, ...config.theme } };
+  });
+  
+  // Update theme
+  fastify.put('/theme', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
+    const { title, subtitle, bannerUrl, colorScheme, customColors } = request.body;
+    const config = configManager.load();
+    
+    config.theme = {
+      title: title || defaultTheme.title,
+      subtitle: subtitle || defaultTheme.subtitle,
+      bannerUrl: bannerUrl || '',
+      colorScheme: colorScheme || 'purple',
+      customColors: customColors || null
+    };
+    
+    configManager.save(config);
+    return { success: true, theme: config.theme };
+  });
+  
+  // Upload banner image
+  fastify.post('/theme/banner', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
+    const { imageData } = request.body;
+    
+    if (!imageData) {
+      return reply.code(400).send({ error: 'No image data provided' });
+    }
+    
+    try {
+      // Save banner image as asset
+      const asset = configManager.saveAssetFromBase64('banner.png', imageData);
+      const bannerUrl = `/api/admin/theme/banner-image/${asset.assetPath}`;
+      
+      // Update theme config
+      const config = configManager.load();
+      config.theme = { ...defaultTheme, ...config.theme, bannerUrl };
+      configManager.save(config);
+      
+      return { success: true, bannerUrl };
+    } catch (err) {
+      return reply.code(500).send({ error: 'Failed to save banner: ' + err.message });
+    }
+  });
+  
+  // Serve banner image
+  fastify.get('/theme/banner-image/:filename', async (request, reply) => {
+    const { filename } = request.params;
+    const fs = require('fs');
+    const path = require('path');
+    const assetPath = path.join(configManager.ASSETS_DIR, filename);
+    
+    if (!fs.existsSync(assetPath)) {
+      return reply.code(404).send({ error: 'Banner not found' });
+    }
+    
+    const buffer = fs.readFileSync(assetPath);
+    const ext = path.extname(filename).toLowerCase();
+    const contentTypes = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
+    
+    reply.header('Content-Type', contentTypes[ext] || 'image/png');
+    reply.header('Cache-Control', 'public, max-age=86400');
+    return reply.send(buffer);
+  });
 }
 
 // Generate NGINX configuration
