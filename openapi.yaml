@@ -1,0 +1,1174 @@
+openapi: 3.0.3
+
+info:
+  title: RoarinAPI Service
+  version: 2.0.0
+  description: |
+    A dynamic, configurable API mock service with a web-based admin UI, built on Fastify.
+
+    The API has three logical surfaces:
+
+    1. **Built-in routes** — `/health`, `/` (redirect to the admin UI) and the static admin UI at `/admin`.
+    2. **Admin API** (`/api/admin/*`) — manage endpoints, assets, scalability, TLS, theming,
+       export/import and server control. Most routes require an authenticated admin session
+       (an `httpOnly` `sessionToken` cookie set by `/api/admin/login`).
+    3. **Dynamic endpoints** — user-defined mock endpoints created through the admin API and
+       served by a wildcard handler. Their paths, methods, protection and responses are all
+       configurable at runtime, so they are **not** part of this fixed contract. The default
+       seeded endpoints (`/ping`, `/status`, `/carlist`, `/echo`, `/blueprint`) are documented
+       here as representative examples under the "Dynamic endpoints (defaults)" tag.
+
+    ## Authentication
+    - **Admin session** (`sessionCookie`): obtained via `/api/admin/setup` (first launch) or
+      `/api/admin/login`. Delivered as an `httpOnly`, `SameSite=Strict` cookie named `sessionToken`
+      (24h TTL, in-memory — invalidated on server restart or password change).
+    - **Per-endpoint bearer** (`endpointBearer`): dynamic endpoints flagged `protected` require an
+      `Authorization: Bearer <token>` header whose token matches the endpoint's configured token.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  contact:
+    name: RoarinPenguin
+
+servers:
+  - url: https://localhost:4242
+    description: Local (HTTPS, default — self-signed certificate)
+  - url: http://localhost:4242
+    description: Local (HTTP, when TLS is disabled)
+
+tags:
+  - name: Health
+    description: Liveness and root routes
+  - name: Auth
+    description: Setup, login, logout and password management
+  - name: Endpoints
+    description: CRUD for dynamic mock endpoints
+  - name: Assets
+    description: Binary asset upload/delete used by binary/image responses
+  - name: Blueprint
+    description: Manage the PNG image served by the default /blueprint endpoint
+  - name: Scalability
+    description: Worker/connection tuning and generated NGINX config
+  - name: Config
+    description: Export/import, system info and server control
+  - name: TLS
+    description: HTTPS certificate configuration
+  - name: Theme
+    description: Admin UI branding
+  - name: Dynamic endpoints (defaults)
+    description: >
+      Representative default endpoints served by the dynamic handler. These are
+      configurable at runtime and shown here only as examples.
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Liveness probe for load balancers and container health checks.
+      security: []
+      responses:
+        '200':
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  timestamp: { type: string, format: date-time }
+
+  /:
+    get:
+      tags: [Health]
+      summary: Root redirect
+      description: Redirects to the admin UI.
+      security: []
+      responses:
+        '302':
+          description: Redirect to `/admin`
+          headers:
+            Location:
+              schema: { type: string, example: /admin }
+
+  /admin:
+    get:
+      tags: [Health]
+      summary: Admin UI
+      description: Serves the single-page admin UI (`index.html`).
+      security: []
+      responses:
+        '200':
+          description: HTML page
+          content:
+            text/html:
+              schema: { type: string }
+
+  # ===================== AUTH =====================
+  /api/admin/setup-status:
+    get:
+      tags: [Auth]
+      summary: Get setup and auth status
+      security: []
+      responses:
+        '200':
+          description: Current setup/auth state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  setupComplete: { type: boolean }
+                  authenticated: { type: boolean }
+
+  /api/admin/setup:
+    post:
+      tags: [Auth]
+      summary: First-launch admin password setup
+      description: Only valid before setup is complete. On success, sets the session cookie.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string, minLength: 8 }
+      responses:
+        '200':
+          description: Setup complete; session cookie set
+          headers:
+            Set-Cookie:
+              schema: { type: string, example: 'sessionToken=...; HttpOnly; SameSite=Strict' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Success' }
+        '400':
+          description: Setup already complete, or password too short
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/admin/login:
+    post:
+      tags: [Auth]
+      summary: Log in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string }
+      responses:
+        '200':
+          description: Authenticated; session cookie set
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Success' }
+        '401':
+          description: Invalid password
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/admin/logout:
+    post:
+      tags: [Auth]
+      summary: Log out
+      description: Invalidates the current session and clears the cookie.
+      security: []
+      responses:
+        '200':
+          description: Logged out
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Success' }
+
+  /api/admin/change-password:
+    post:
+      tags: [Auth]
+      summary: Change admin password
+      description: Invalidates all sessions on success; the caller must log in again.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string }
+                newPassword: { type: string, minLength: 8 }
+      responses:
+        '200':
+          description: Password changed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Success' }
+        '401':
+          description: Current password incorrect / not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '400':
+          description: New password too short
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  # ===================== ENDPOINTS =====================
+  /api/admin/endpoints:
+    get:
+      tags: [Endpoints]
+      summary: List all endpoints
+      responses:
+        '200':
+          description: All configured endpoints
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  endpoints:
+                    type: array
+                    items: { $ref: '#/components/schemas/Endpoint' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Endpoints]
+      summary: Create an endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EndpointInput' }
+      responses:
+        '200':
+          description: Created endpoint
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  endpoint: { $ref: '#/components/schemas/Endpoint' }
+        '400':
+          description: Missing/invalid path or method, or reserved path
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/admin/endpoints/{id}:
+    parameters:
+      - $ref: '#/components/parameters/EndpointId'
+    get:
+      tags: [Endpoints]
+      summary: Get a single endpoint
+      responses:
+        '200':
+          description: The endpoint
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  endpoint: { $ref: '#/components/schemas/Endpoint' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [Endpoints]
+      summary: Update an endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EndpointInput' }
+      responses:
+        '200':
+          description: Updated endpoint
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  endpoint: { $ref: '#/components/schemas/Endpoint' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [Endpoints]
+      summary: Delete an endpoint
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Success' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ===================== ASSETS =====================
+  /api/admin/assets:
+    post:
+      tags: [Assets]
+      summary: Upload a binary asset
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Stored asset metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  asset:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      filename: { type: string }
+                      path: { type: string }
+                      ext: { type: string }
+        '400':
+          description: No file uploaded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/admin/assets/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      tags: [Assets]
+      summary: Delete an asset
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Success' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ===================== BLUEPRINT =====================
+  /api/admin/blueprint:
+    get:
+      tags: [Blueprint]
+      summary: Get blueprint image status
+      responses:
+        '200':
+          description: Current blueprint state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BlueprintInfo' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Blueprint]
+      summary: Upload / change the blueprint image
+      description: PNG only (validated by magic bytes). Any uploaded filename is stored as `blueprint.png`.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - $ref: '#/components/schemas/BlueprintInfo'
+        '400':
+          description: No file uploaded, or file is not a valid PNG
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [Blueprint]
+      summary: Reset the blueprint image to the built-in default
+      description: Restores the bundled default image (or removes the file if no default is bundled).
+      responses:
+        '200':
+          description: Reset/removed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - $ref: '#/components/schemas/BlueprintInfo'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/admin/blueprint/image:
+    get:
+      tags: [Blueprint]
+      summary: Serve the current blueprint image (admin preview)
+      responses:
+        '200':
+          description: PNG bytes
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ===================== SCALABILITY =====================
+  /api/admin/scalability:
+    get:
+      tags: [Scalability]
+      summary: Get scalability settings and resource estimate
+      responses:
+        '200':
+          description: Settings and estimate
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scalability: { $ref: '#/components/schemas/Scalability' }
+                  resources: { $ref: '#/components/schemas/ResourceEstimate' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [Scalability]
+      summary: Update scalability settings
+      description: Values are clamped (workers 1–16, maxConnections 100–10000).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Scalability' }
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scalability: { $ref: '#/components/schemas/Scalability' }
+                  resources: { $ref: '#/components/schemas/ResourceEstimate' }
+                  nginxReloadRequired: { type: boolean }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/admin/nginx-config:
+    get:
+      tags: [Scalability]
+      summary: Generate NGINX config from current scalability settings
+      responses:
+        '200':
+          description: NGINX config text
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  config: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/admin/nginx-reload:
+    post:
+      tags: [Scalability]
+      summary: Reload NGINX
+      description: Attempts several reload commands (direct, docker exec, service, init script).
+      responses:
+        '200':
+          description: Result (success flag varies by environment)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  command: { type: string }
+                  error: { type: string }
+                  hint: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/admin/nginx-status:
+    get:
+      tags: [Scalability]
+      summary: Check NGINX status / config validity
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  running: { type: boolean }
+                  configValid: { type: boolean }
+                  output: { type: string }
+                  error: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ===================== CONFIG =====================
+  /api/admin/export:
+    get:
+      tags: [Config]
+      summary: Export full configuration
+      description: Returns config (secrets stripped), endpoints and base64-encoded assets as a downloadable JSON.
+      responses:
+        '200':
+          description: Exported configuration
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExportBundle' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/admin/import:
+    post:
+      tags: [Config]
+      summary: Import configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExportBundle' }
+      responses:
+        '200':
+          description: Imported
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Success' }
+        '400':
+          description: Invalid configuration format
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/admin/system-info:
+    get:
+      tags: [Config]
+      summary: System information
+      responses:
+        '200':
+          description: Runtime stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version: { type: string }
+                  uptime: { type: number, description: Seconds }
+                  memory:
+                    type: object
+                    description: Node.js process.memoryUsage()
+                  port: { type: integer }
+                  endpoints:
+                    type: object
+                    properties:
+                      total: { type: integer }
+                      enabled: { type: integer }
+                      protected: { type: integer }
+                  scalability: { $ref: '#/components/schemas/Scalability' }
+                  resources: { $ref: '#/components/schemas/ResourceEstimate' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/admin/server-config:
+    get:
+      tags: [Config]
+      summary: Get server port configuration
+      responses:
+        '200':
+          description: Port config
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  port: { type: integer }
+                  currentPort: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Config]
+      summary: Set server port (requires restart)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [port]
+              properties:
+                port: { type: integer, minimum: 1, maximum: 65535 }
+      responses:
+        '200':
+          description: Port saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  port: { type: integer }
+                  message: { type: string }
+                  restartRequired: { type: boolean }
+        '400':
+          description: Port out of range
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/admin/server-restart:
+    post:
+      tags: [Config]
+      summary: Restart the server
+      description: Sends a response, then exits the process (relies on Docker/PM2 to restart).
+      responses:
+        '200':
+          description: Restart initiated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ===================== TLS =====================
+  /api/admin/tls:
+    get:
+      tags: [TLS]
+      summary: Get TLS configuration
+      responses:
+        '200':
+          description: TLS state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled: { type: boolean }
+                  useCustom: { type: boolean }
+                  selfSignedExists: { type: boolean }
+                  customExists: { type: boolean }
+                  customInfo: { type: string, nullable: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [TLS]
+      summary: Update TLS configuration (requires restart)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled: { type: boolean }
+                useCustom: { type: boolean }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  tls:
+                    type: object
+                    properties:
+                      enabled: { type: boolean }
+                      useCustom: { type: boolean }
+                  message: { type: string }
+                  restartRequired: { type: boolean }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/admin/tls/generate:
+    post:
+      tags: [TLS]
+      summary: Generate self-signed certificates
+      responses:
+        '200':
+          description: Generated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Success' }
+        '500':
+          description: Generation failed (openssl missing?)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/admin/tls/upload:
+    post:
+      tags: [TLS]
+      summary: Upload custom certificate and key
+      description: Accepts raw PEM text or `data:` base64 URLs. Switches TLS to custom mode.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [keyData, certData]
+              properties:
+                keyData: { type: string }
+                certData: { type: string }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  restartRequired: { type: boolean }
+        '400':
+          description: Missing key or certificate
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500':
+          description: Save failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/admin/tls/custom:
+    delete:
+      tags: [TLS]
+      summary: Delete custom certificates
+      description: Reverts to self-signed certificates.
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Success' }
+        '500':
+          description: Delete failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ===================== THEME =====================
+  /api/admin/theme:
+    get:
+      tags: [Theme]
+      summary: Get theme (public — used by the login page)
+      security: []
+      responses:
+        '200':
+          description: Theme
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  theme: { $ref: '#/components/schemas/Theme' }
+    put:
+      tags: [Theme]
+      summary: Update theme
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Theme' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  theme: { $ref: '#/components/schemas/Theme' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/admin/theme/banner:
+    post:
+      tags: [Theme]
+      summary: Upload a banner image (base64)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [imageData]
+              properties:
+                imageData:
+                  type: string
+                  description: base64 data URL, e.g. `data:image/png;base64,...`
+      responses:
+        '200':
+          description: Uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  bannerUrl: { type: string }
+        '400':
+          description: No image data
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/admin/theme/banner-image/{filename}:
+    get:
+      tags: [Theme]
+      summary: Serve a banner image (public)
+      security: []
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Image bytes
+          content:
+            image/png: { schema: { type: string, format: binary } }
+            image/jpeg: { schema: { type: string, format: binary } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ===================== DYNAMIC DEFAULTS =====================
+  /ping:
+    get:
+      tags: [Dynamic endpoints (defaults)]
+      summary: Ping (default seeded endpoint)
+      security: []
+      responses:
+        '200':
+          description: Pong
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: pong }
+
+  /status:
+    get:
+      tags: [Dynamic endpoints (defaults)]
+      summary: API status (default seeded endpoint)
+      description: Demonstrates the `{{timestamp}}` template variable.
+      security: []
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  time: { type: string, format: date-time }
+
+  /carlist:
+    get:
+      tags: [Dynamic endpoints (defaults)]
+      summary: Car list (default seeded, bearer-protected)
+      security:
+        - endpointBearer: []
+      responses:
+        '200':
+          description: List of cars
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    manufacturer: { type: string }
+                    model: { type: string }
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /echo:
+    post:
+      tags: [Dynamic endpoints (defaults)]
+      summary: Echo posted JSON (default seeded, bearer-protected)
+      security:
+        - endpointBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          description: Echoed body
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  echo: { type: object }
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /blueprint:
+    get:
+      tags: [Dynamic endpoints (defaults)]
+      summary: Blueprint image (default seeded, binary response)
+      description: >
+        Returns a binary asset from `data/assets/`. Requires the asset file to be present.
+      security: []
+      responses:
+        '200':
+          description: Image bytes
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+        '404':
+          description: Asset file not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: sessionToken
+      description: httpOnly session cookie set by /api/admin/login or /api/admin/setup.
+    endpointBearer:
+      type: http
+      scheme: bearer
+      description: Per-endpoint bearer token for dynamic endpoints flagged `protected`.
+
+  parameters:
+    EndpointId:
+      name: id
+      in: path
+      required: true
+      description: Endpoint UUID
+      schema: { type: string, format: uuid }
+
+  responses:
+    Unauthorized:
+      description: Not authenticated
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Success:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        message: { type: string }
+
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        needsAuth: { type: boolean }
+        needsSetup: { type: boolean }
+
+    ResponseSpec:
+      type: object
+      description: A single response definition. Fields used depend on the endpoint's responseType.
+      properties:
+        condition:
+          type: string
+          nullable: true
+          description: >
+            Optional condition expression evaluated against request data, e.g.
+            `query.name == 'foo'`. The first matching condition wins; otherwise the
+            first unconditional response is used.
+        data:
+          description: JSON payload (responseType=json) or text (responseType=text). Supports template variables.
+        text:
+          type: string
+          description: Text body (responseType=text).
+        fileName:
+          type: string
+          description: Suggested filename for binary responses.
+        contentType:
+          type: string
+          description: Content-Type for binary responses.
+        assetPath:
+          type: string
+          description: Stored asset filename under data/assets (binary responses).
+        assetId:
+          type: string
+          description: Legacy asset id (binary responses).
+        base64:
+          type: string
+          description: Inline base64 body (binary responses).
+        fileData:
+          type: string
+          description: On create/update, a base64 data URL that is stored and replaced by assetPath.
+        redirectUrl:
+          type: string
+          description: Target URL (responseType=redirect).
+
+    BlueprintInfo:
+      type: object
+      properties:
+        exists: { type: boolean, description: Whether a blueprint.png is currently stored }
+        size: { type: integer, description: File size in bytes }
+        isDefault: { type: boolean, description: True if the stored image matches the built-in default }
+        hasDefault: { type: boolean, description: Whether a built-in default image is bundled }
+
+    Parameter:
+      type: object
+      properties:
+        name: { type: string }
+        required: { type: boolean }
+        description: { type: string }
+
+    EndpointInput:
+      type: object
+      required: [path, method]
+      properties:
+        path:
+          type: string
+          description: Must start with `/` and not collide with reserved paths (/admin, /api/admin, /health).
+          example: /api/users
+        method:
+          type: string
+          enum: [GET, POST, PUT, DELETE, PATCH, ANY]
+        description: { type: string }
+        protected:
+          type: boolean
+          description: If true, requires a matching bearer token.
+        token:
+          type: string
+          nullable: true
+          description: Bearer token required when protected.
+        parameterSource:
+          type: string
+          enum: [none, query, header, body, mixed]
+          default: none
+        parameters:
+          type: array
+          items: { $ref: '#/components/schemas/Parameter' }
+        responseType:
+          type: string
+          enum: [json, text, binary, image, redirect]
+          default: json
+        responses:
+          type: array
+          items: { $ref: '#/components/schemas/ResponseSpec' }
+        enabled:
+          type: boolean
+          default: true
+
+    Endpoint:
+      allOf:
+        - $ref: '#/components/schemas/EndpointInput'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+
+    Scalability:
+      type: object
+      properties:
+        workers: { type: integer, minimum: 1, maximum: 16, example: 1 }
+        maxConnections: { type: integer, minimum: 100, maximum: 10000, example: 1000 }
+        connectionTimeout: { type: integer, description: ms, example: 30000 }
+        keepAliveTimeout: { type: integer, description: ms, example: 5000 }
+
+    ResourceEstimate:
+      type: object
+      properties:
+        memory:
+          type: object
+          properties:
+            estimated: { type: integer }
+            recommended: { type: integer }
+            unit: { type: string, example: MB }
+        cpu:
+          type: object
+          properties:
+            estimated: { type: number }
+            recommended: { type: number }
+            unit: { type: string, example: cores }
+        throughput:
+          type: object
+          properties:
+            estimated: { type: integer }
+            unit: { type: string, example: requests/sec }
+        concurrency:
+          type: object
+          properties:
+            max: { type: integer }
+            perWorker: { type: integer }
+
+    Theme:
+      type: object
+      properties:
+        title: { type: string, example: RoarinAPI Service }
+        subtitle: { type: string, example: API Mock Service Admin }
+        bannerUrl: { type: string }
+        colorScheme:
+          type: string
+          enum: [purple, blue, green, red, orange, slate]
+          default: purple
+        customColors:
+          type: object
+          nullable: true
+
+    ExportBundle:
+      type: object
+      properties:
+        version: { type: string, example: 1.0.0 }
+        exportedAt: { type: string, format: date-time }
+        config:
+          type: object
+          description: Server config with secrets (password hash, session secret) stripped.
+        endpoints:
+          type: array
+          items: { $ref: '#/components/schemas/Endpoint' }
+        assets:
+          type: object
+          additionalProperties: { type: string, description: base64-encoded file }
+          description: Map of filename to base64 content.
+
+security:
+  - sessionCookie: []

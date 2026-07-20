@@ -27,10 +27,7 @@ data/
 # Documentation (not needed in image)
 *.md
 LICENSE
-blueprint.png
-
-# Old source (migrated to src/)
-index.js
+openapi.yaml
 
 # Docker files (not needed inside container)
 Dockerfile

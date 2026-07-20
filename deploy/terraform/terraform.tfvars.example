@@ -1,0 +1,20 @@
+# Copy to terraform.tfvars and edit.
+
+region        = "eu-west-1"
+instance_type = "t4g.medium"
+
+# REQUIRED: image you pushed to ECR (see README step 1).
+container_image = "123456789012.dkr.ecr.eu-west-1.amazonaws.com/roarinapi:latest"
+
+# Public TLS (strongly recommended). Requires an existing Route 53 hosted zone.
+# Leave both empty to expose HTTP-only on the ALB DNS name (testing only).
+domain_name    = "api.example.com"
+hosted_zone_id = "Z0123456789ABCDEFGHIJ"
+
+# Lock the admin UI to your office / VPN egress IPs. Do NOT leave 0.0.0.0/0.
+admin_allowed_cidrs = ["203.0.113.10/32"]
+
+# Capacity for ~150 concurrent users: 2 instances is ample + HA headroom.
+asg_min_size         = 2
+asg_desired_capacity = 2
+asg_max_size         = 4

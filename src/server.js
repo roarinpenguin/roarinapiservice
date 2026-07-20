@@ -12,7 +12,13 @@ const certificates = require('./utils/certificates');
 
 async function buildServer(httpsOptions = null) {
   const config = configManager.load();
-  
+
+  // Seed the built-in default blueprint image if the data volume doesn't have one yet
+  configManager.ensureDefaultBlueprint();
+
+  // Ensure a one-time setup token exists while setup is pending (H1).
+  configManager.ensureSetupToken();
+
   const fastifyOptions = {
     logger: {
       level: config.logLevel || 'info'
@@ -26,6 +32,46 @@ async function buildServer(httpsOptions = null) {
   }
   
   const fastify = Fastify(fastifyOptions);
+
+  // Security headers (A05). Prefer @fastify/helmet; if it isn't installed yet,
+  // fall back to an equivalent header set so the service is never left without
+  // security headers. CSP is tailored to the Alpine.js admin UI (Alpine from
+  // unpkg + inline scripts/styles + expression eval), and Cross-Origin-Resource
+  // -Policy is relaxed because this is a mock API meant to be consumed by anyone.
+  try {
+    const helmet = require('@fastify/helmet');
+    await fastify.register(helmet, {
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://unpkg.com'],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:'],
+          connectSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          baseUri: ["'self'"],
+          frameAncestors: ["'none'"],
+          // Removed so the plain-HTTP fallback mode (no ALB/TLS) still works.
+          upgradeInsecureRequests: null
+        }
+      },
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      hsts: { maxAge: 15552000, includeSubDomains: true }
+    });
+  } catch (err) {
+    if (err && err.code === 'MODULE_NOT_FOUND') {
+      const { SECURITY_HEADERS } = require('./plugins/securityHeaders');
+      fastify.addHook('onSend', async (request, reply, payload) => {
+        for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+          reply.header(name, value);
+        }
+        return payload;
+      });
+      fastify.log.warn('@fastify/helmet not installed; using built-in security-headers fallback. Run `npm install` to enable helmet.');
+    } else {
+      throw err;
+    }
+  }
 
   // Register multipart for file uploads
   await fastify.register(require('@fastify/multipart'), {
@@ -98,9 +144,16 @@ async function start() {
   
   // Check if setup is needed
   if (!config.adminPasswordHash) {
+    const setupToken = configManager.ensureSetupToken();
     console.log('\n🐧 RoarinAPI Service - First Launch Setup Required');
     console.log(`Access the admin panel at ${protocol}://localhost:${port}/admin`);
-    console.log('You will be prompted to set an admin password.\n');
+    console.log('You will be prompted for a setup token and an admin password.');
+    if (process.env.SETUP_TOKEN) {
+      console.log('🔑 Setup token: (provided via SETUP_TOKEN environment variable)\n');
+    } else {
+      console.log('🔑 Setup token (required to create the admin account):');
+      console.log(`   ${setupToken}\n`);
+    }
   }
 
   const server = await buildServer(httpsOptions);
