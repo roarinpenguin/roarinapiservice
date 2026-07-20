@@ -144,6 +144,11 @@
         <div x-show="error" class="alert alert-error" x-text="error"></div>
         <form @submit.prevent="setup()">
           <div class="form-group">
+            <label class="form-label">Setup Token</label>
+            <input type="text" class="form-input" x-model="setupToken" required autocomplete="off" placeholder="From server logs / SETUP_TOKEN">
+            <small style="opacity:0.7">Printed in the server logs on first launch (or the SETUP_TOKEN you configured).</small>
+          </div>
+          <div class="form-group">
             <label class="form-label">Admin Password (min 8 chars)</label>
             <input type="password" class="form-input" x-model="password" required minlength="8" placeholder="Enter secure password">
           </div>
@@ -473,6 +478,35 @@
         
         <button class="btn btn-primary" @click="saveTheme()">💾 Save Theme</button>
       </div>
+
+      <!-- Blueprint Image -->
+      <div class="card" style="margin-top: 1.5rem;">
+        <div class="card-title">🗺️ Blueprint Image</div>
+        <p style="margin-bottom: 1rem; color: var(--gray-600);">
+          The image served by the <code>/blueprint</code> endpoint. Uploads are validated as PNG and always stored as <code>blueprint.png</code>.
+        </p>
+        <div x-show="blueprintMsg" class="alert" :class="blueprintErr ? 'alert-error' : 'alert-success'" x-text="blueprintMsg"></div>
+
+        <div x-show="blueprint.exists" style="margin-bottom: 1rem;">
+          <img :src="'/api/admin/blueprint/image?t=' + blueprintBust" style="max-height: 240px; border-radius: 10px; border: 1px solid var(--gray-200);" alt="Blueprint preview">
+          <div style="margin-top: 0.5rem; color: var(--gray-500); font-size: 0.85rem;">
+            <span x-text="(blueprint.size / 1024).toFixed(0) + ' KB'"></span>
+            <span x-show="blueprint.isDefault"> · built-in default</span>
+            <span x-show="!blueprint.isDefault"> · custom image</span>
+          </div>
+        </div>
+        <div x-show="!blueprint.exists" class="empty-state">
+          <div class="empty-icon">🗺️</div>
+          <p>No blueprint image set.</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Upload / Change Image</label>
+          <input type="file" class="form-input" accept="image/png,.png" @change="uploadBlueprint($event)">
+          <small style="display: block; margin-top: 0.25rem; color: var(--gray-500);">PNG only. Any filename you choose is saved as blueprint.png.</small>
+        </div>
+        <button class="btn btn-danger" @click="resetBlueprint()" x-show="blueprint.hasDefault && !blueprint.isDefault">↩️ Reset to Default</button>
+      </div>
     </div>
 
   </div>
@@ -562,7 +596,7 @@
   <script>
     function app() {
       return {
-        needsSetup: true, authenticated: false, loading: false, error: '', password: '', confirmPassword: '',
+        needsSetup: true, authenticated: false, loading: false, error: '', password: '', confirmPassword: '', setupToken: '',
         tab: 'dashboard', endpoints: [], systemInfo: null, modal: false, editing: null,
         scalability: { workers: 1, maxConnections: 1000, connectionTimeout: 30000, keepAliveTimeout: 5000 },
         resources: null, nginxConfig: '', showNginx: false, nginxMsg: '', nginxErr: false,
@@ -572,6 +606,8 @@
         tlsMsg: '', tlsErr: false, tlsChanged: false, tlsKeyData: null, tlsCertData: null,
         theme: { title: 'RoarinAPI Service', subtitle: 'API Mock Service Admin', bannerUrl: '', colorScheme: 'purple' },
         themeMsg: '', themeErr: false,
+        blueprint: { exists: false, isDefault: false, size: 0, hasDefault: false },
+        blueprintMsg: '', blueprintErr: false, blueprintBust: 0,
         form: { method: 'GET', path: '/', description: '', protected: false, token: '', parameterSource: 'none', responseType: 'json', responseJson: '{}', responseText: '', fileName: '', contentType: '', redirectUrl: '', fileData: null, enabled: true },
 
         get memUsed() { return Math.round((this.systemInfo?.memory?.heapUsed || 0) / 1024 / 1024); },
@@ -594,11 +630,11 @@
           if (this.password !== this.confirmPassword) { this.error = 'Passwords do not match'; return; }
           this.loading = true; this.error = '';
           try {
-            const r = await fetch('/api/admin/setup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: this.password }) });
+            const r = await fetch('/api/admin/setup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: this.password, setupToken: this.setupToken }) });
             if (r.ok) { this.needsSetup = false; this.authenticated = true; await this.loadAll(); }
             else { const d = await r.json(); this.error = d.error; }
           } catch (e) { this.error = 'Setup failed'; }
-          this.loading = false; this.password = ''; this.confirmPassword = '';
+          this.loading = false; this.password = ''; this.confirmPassword = ''; this.setupToken = '';
         },
 
         async login() {
@@ -617,7 +653,7 @@
         },
 
         async loadAll() {
-          await Promise.all([this.loadEndpoints(), this.loadSystem(), this.loadScalability(), this.loadTls()]);
+          await Promise.all([this.loadEndpoints(), this.loadSystem(), this.loadScalability(), this.loadTls(), this.loadBlueprint()]);
         },
 
         async loadEndpoints() {
@@ -955,6 +991,53 @@
           };
           reader.readAsDataURL(file);
           e.target.value = '';
+        },
+
+        async loadBlueprint() {
+          try {
+            const r = await fetch('/api/admin/blueprint');
+            if (!r.ok) return;
+            this.blueprint = await r.json();
+            this.blueprintBust = Date.now();
+          } catch (e) { console.error('loadBlueprint error:', e); }
+        },
+
+        async uploadBlueprint(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          this.blueprintMsg = ''; this.blueprintErr = false;
+          if (file.type && file.type !== 'image/png') {
+            this.blueprintErr = true; this.blueprintMsg = 'Only PNG images are allowed';
+            e.target.value = ''; return;
+          }
+          const fd = new FormData();
+          fd.append('file', file);
+          try {
+            const r = await fetch('/api/admin/blueprint', { method: 'POST', body: fd });
+            const d = await r.json();
+            if (r.ok && d.success) {
+              this.blueprintErr = false; this.blueprintMsg = 'Blueprint image updated!';
+              await this.loadBlueprint();
+            } else {
+              this.blueprintErr = true; this.blueprintMsg = d.error || 'Upload failed';
+            }
+          } catch (err) { this.blueprintErr = true; this.blueprintMsg = 'Upload failed'; }
+          e.target.value = '';
+        },
+
+        async resetBlueprint() {
+          if (!confirm('Reset the blueprint image to the built-in default?')) return;
+          this.blueprintMsg = ''; this.blueprintErr = false;
+          try {
+            const r = await fetch('/api/admin/blueprint', { method: 'DELETE' });
+            const d = await r.json();
+            if (r.ok && d.success) {
+              this.blueprintErr = false; this.blueprintMsg = d.message;
+              await this.loadBlueprint();
+            } else {
+              this.blueprintErr = true; this.blueprintMsg = d.error || 'Reset failed';
+            }
+          } catch (e) { this.blueprintErr = true; this.blueprintMsg = 'Reset failed'; }
         }
       };
     }

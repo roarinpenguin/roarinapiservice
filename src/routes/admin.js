@@ -3,6 +3,7 @@
 const configManager = require('../config/configManager');
 const certificates = require('../utils/certificates');
 const { exec } = require('child_process');
+const fs = require('fs');
 
 async function adminRoutes(fastify, options) {
   
@@ -19,13 +20,21 @@ async function adminRoutes(fastify, options) {
     if (fastify.isSetupComplete()) {
       return reply.code(400).send({ error: 'Setup already complete' });
     }
-    
-    const { password } = request.body;
+
+    const { password, setupToken } = request.body || {};
+
+    // H1: require the one-time setup token so a random visitor can't claim the
+    // admin account before the operator does.
+    if (!fastify.verifySetupToken(setupToken)) {
+      return reply.code(401).send({ error: 'Invalid or missing setup token', needsSetupToken: true });
+    }
+
     if (!password || password.length < 8) {
       return reply.code(400).send({ error: 'Password must be at least 8 characters' });
     }
-    
+
     fastify.setupPassword(password);
+    configManager.clearSetupToken();
     const token = fastify.login(password);
     
     reply.setCookie('sessionToken', token, {
@@ -207,8 +216,53 @@ async function adminRoutes(fastify, options) {
     return { success: true };
   });
   
+  // ===== BLUEPRINT IMAGE =====
+
+  // Get blueprint status (exists, size, whether it's the built-in default)
+  fastify.get('/blueprint', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
+    return configManager.getBlueprintInfo();
+  });
+
+  // Serve the current blueprint image for the admin preview
+  fastify.get('/blueprint/image', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
+    const info = configManager.getBlueprintInfo();
+    if (!info.exists) {
+      return reply.code(404).send({ error: 'No blueprint image set' });
+    }
+    const buffer = fs.readFileSync(configManager.BLUEPRINT_FILE);
+    reply.header('Content-Type', 'image/png');
+    reply.header('Cache-Control', 'no-store');
+    return reply.send(buffer);
+  });
+
+  // Upload / change the blueprint image (PNG only, always stored as blueprint.png)
+  fastify.post('/blueprint', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
+    const data = await request.file();
+    if (!data) {
+      return reply.code(400).send({ error: 'No file uploaded' });
+    }
+    const buffer = await data.toBuffer();
+    try {
+      configManager.saveBlueprint(buffer);
+    } catch (err) {
+      return reply.code(400).send({ error: err.message || 'Invalid PNG file' });
+    }
+    return { success: true, message: 'Blueprint image updated', ...configManager.getBlueprintInfo() };
+  });
+
+  // Remove the current blueprint image, restoring the built-in default
+  fastify.delete('/blueprint', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
+    configManager.resetBlueprint();
+    const info = configManager.getBlueprintInfo();
+    return {
+      success: true,
+      message: info.exists ? 'Blueprint reset to default' : 'Blueprint removed',
+      ...info
+    };
+  });
+
   // ===== SCALABILITY =====
-  
+
   // Get scalability settings
   fastify.get('/scalability', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
     const scalability = configManager.getScalability();
@@ -532,9 +586,9 @@ async function adminRoutes(fastify, options) {
     const { filename } = request.params;
     const fs = require('fs');
     const path = require('path');
-    const assetPath = path.join(configManager.ASSETS_DIR, filename);
-    
-    if (!fs.existsSync(assetPath)) {
+    const assetPath = configManager.resolveAssetPath(filename);
+
+    if (!assetPath || !fs.existsSync(assetPath)) {
       return reply.code(404).send({ error: 'Banner not found' });
     }
     

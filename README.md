@@ -69,7 +69,17 @@ roarinapiservice/
 │   └── nginx.conf             # NGINX reverse proxy config
 ├── Dockerfile                 # Multi-stage Docker build
 ├── docker-compose.yml         # Docker Compose setup
+├── openapi.yaml               # OpenAPI 3.0 spec (admin API + endpoints)
 └── package.json
+```
+
+## 📖 API Documentation
+
+The full HTTP contract is documented in [`openapi.yaml`](openapi.yaml) (OpenAPI 3.0). View it with any
+Swagger UI / Redoc instance, e.g.:
+
+```bash
+npx @redocly/cli preview-docs openapi.yaml
 ```
 
 ## ⚙️ Configuration
