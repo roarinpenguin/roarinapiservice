@@ -111,12 +111,16 @@ URL=$(terraform output -raw service_url)
 # health check
 curl -s "$URL/health"                       # {"status":"ok",...}
 
-# open (unauthenticated) mock endpoint
-curl -s "$URL/ping"                          # {"message":"pong"}
+# open (unauthenticated) mock endpoint — also reveals the per-deployment token
+curl -s "$URL/ping"                          # {"message":"pong","token":"<hex>"}
+
+# grab the sample protected-endpoint token from /ping (no jq needed)
+TOKEN=$(curl -s "$URL/ping" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+echo "token: $TOKEN"
 
 # token-protected endpoint — 401 without token, 200 with it
 curl -s -o /dev/null -w "%{http_code}\n" "$URL/carlist"
-curl -s "$URL/carlist" -H "Authorization: Bearer let-th3PenguinR0ar!"
+curl -s "$URL/carlist" -H "Authorization: Bearer $TOKEN"
 
 # security headers present (helmet / fallback)
 curl -sI "$URL/ping" | grep -iE "content-security-policy|x-frame-options|strict-transport"
