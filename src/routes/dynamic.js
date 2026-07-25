@@ -3,6 +3,17 @@
 const configManager = require('../config/configManager');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+
+// Constant-time string comparison for bearer tokens (M1). Returns false on type
+// mismatch or unequal length; timingSafeEqual requires equal-length buffers.
+function constantTimeEquals(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
 
 async function dynamicRoutes(fastify, options) {
   
@@ -37,7 +48,7 @@ async function dynamicRoutes(fastify, options) {
       }
       
       const token = authHeader.replace('Bearer ', '');
-      if (token !== endpoint.token) {
+      if (!constantTimeEquals(token, endpoint.token)) {
         return reply.code(401).send({ error: 'Invalid token' });
       }
     }
@@ -453,3 +464,4 @@ function processTemplateString(str, params, request) {
 module.exports = dynamicRoutes;
 // Exposed for unit testing of the safe condition engine.
 module.exports.evaluateCondition = evaluateCondition;
+module.exports.constantTimeEquals = constantTimeEquals;

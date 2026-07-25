@@ -2,6 +2,7 @@
 
 const configManager = require('../config/configManager');
 const certificates = require('../utils/certificates');
+const { createRateLimiter } = require('../plugins/rateLimit');
 const { exec } = require('child_process');
 const fs = require('fs');
 
@@ -11,6 +12,19 @@ async function adminRoutes(fastify, options) {
   // accept large payloads (base64 assets/images, config import, uploads). The
   // global default is small (M6); these opt back up to 50MB.
   const UPLOAD_BODY_LIMIT = 50 * 1024 * 1024;
+
+  // Per-IP rate limiting on the unauthenticated auth endpoints (H2 brute-force).
+  const RATE_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+  const loginLimiter = createRateLimiter({
+    name: 'login',
+    max: parseInt(process.env.LOGIN_RATE_LIMIT || '10', 10),
+    windowMs: RATE_WINDOW_MS
+  });
+  const setupLimiter = createRateLimiter({
+    name: 'setup',
+    max: parseInt(process.env.SETUP_RATE_LIMIT || '10', 10),
+    windowMs: RATE_WINDOW_MS
+  });
 
 
   // Check setup status
@@ -22,7 +36,7 @@ async function adminRoutes(fastify, options) {
   });
   
   // Initial setup
-  fastify.post('/setup', async (request, reply) => {
+  fastify.post('/setup', { preHandler: [setupLimiter.preHandler] }, async (request, reply) => {
     if (fastify.isSetupComplete()) {
       return reply.code(400).send({ error: 'Setup already complete' });
     }
@@ -55,7 +69,7 @@ async function adminRoutes(fastify, options) {
   });
   
   // Login
-  fastify.post('/login', async (request, reply) => {
+  fastify.post('/login', { preHandler: [loginLimiter.preHandler] }, async (request, reply) => {
     const { password } = request.body;
     const token = fastify.login(password);
     
