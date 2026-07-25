@@ -60,7 +60,7 @@ async function adminRoutes(fastify, options) {
     reply.setCookie('sessionToken', token, {
       path: '/',
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: request.protocol === 'https',
       sameSite: 'strict',
       maxAge: 24 * 60 * 60 // 24 hours
     });
@@ -80,7 +80,7 @@ async function adminRoutes(fastify, options) {
     reply.setCookie('sessionToken', token, {
       path: '/',
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: request.protocol === 'https',
       sameSite: 'strict',
       maxAge: 24 * 60 * 60
     });
@@ -338,7 +338,8 @@ async function adminRoutes(fastify, options) {
       
       return { success: true, message: 'Configuration imported successfully' };
     } catch (err) {
-      return reply.code(400).send({ error: 'Failed to import configuration: ' + err.message });
+      request.log.error({ err }, 'Config import failed');
+      return reply.code(400).send({ error: 'Failed to import configuration' });
     }
   });
   
