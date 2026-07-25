@@ -22,6 +22,41 @@ jobs:
       - run: npm ci
       - run: npm test
 
+  smoke:
+    name: Boot smoke test (Fastify 5)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - name: Boot server and probe endpoints
+        env:
+          USE_HTTPS: "false"
+          HOST: "127.0.0.1"
+          PORT: "4242"
+          DATA_DIR: "/tmp/roarin-smoke"
+        run: |
+          node src/server.js &
+          SERVER_PID=$!
+          ok=""
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:4242/health > /dev/null; then ok=1; break; fi
+            sleep 1
+          done
+          if [ -z "$ok" ]; then
+            echo "::error::server did not become healthy under Fastify 5"
+            kill $SERVER_PID 2>/dev/null || true
+            exit 1
+          fi
+          echo "health OK"
+          curl -sf http://127.0.0.1:4242/ping || { echo "::error::/ping failed"; kill $SERVER_PID 2>/dev/null || true; exit 1; }
+          echo "ping OK"
+          kill $SERVER_PID 2>/dev/null || true
+          echo "Fastify 5 boot smoke test passed"
+
   audit:
     name: Dependency audit (OWASP A06 / L5)
     runs-on: ubuntu-latest
