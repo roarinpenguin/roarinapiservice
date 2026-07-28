@@ -2,7 +2,7 @@
 # Multi-stage build for minimal footprint
 
 # Build stage
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
 # Production stage
-FROM node:22-alpine
+FROM node:26-alpine
 
 # Install dumb-init for proper signal handling and openssl for certificate generation
 RUN apk add --no-cache dumb-init openssl
