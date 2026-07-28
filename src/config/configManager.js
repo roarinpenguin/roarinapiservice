@@ -50,6 +50,13 @@ function writeFileAtomic(file, data) {
   fs.renameSync(tmp, file);
 }
 
+// Per-deployment bearer token for the seeded protected sample endpoints (M5).
+// Generated once at first-boot seeding (persisted to endpoints.json in the data
+// volume) instead of shipping a hardcoded credential in source. Per the mock's
+// design it is discoverable via the open /ping endpoint, so a client fetches it
+// there and uses it as the Bearer token on the protected sample endpoints.
+const DEFAULT_PROTECTED_TOKEN = crypto.randomBytes(24).toString('hex');
+
 // Default configuration
 const defaultConfig = {
   adminPasswordHash: null,
@@ -78,7 +85,7 @@ const defaultEndpoints = [
     responses: [
       {
         condition: null,
-        data: { message: 'pong' }
+        data: { message: 'pong', token: DEFAULT_PROTECTED_TOKEN }
       }
     ],
     enabled: true,
@@ -109,7 +116,7 @@ const defaultEndpoints = [
     method: 'GET',
     description: 'Returns a list of cars',
     protected: true,
-    token: 'let-th3PenguinR0ar!',
+    token: DEFAULT_PROTECTED_TOKEN,
     parameterSource: 'none',
     parameters: [],
     responseType: 'json',
@@ -139,7 +146,7 @@ const defaultEndpoints = [
     method: 'POST',
     description: 'Echoes back posted JSON',
     protected: true,
-    token: 'let-th3PenguinR0ar!',
+    token: DEFAULT_PROTECTED_TOKEN,
     parameterSource: 'body',
     parameters: [],
     responseType: 'json',

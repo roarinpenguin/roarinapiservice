@@ -23,7 +23,14 @@ async function buildServer(httpsOptions = null) {
     logger: {
       level: config.logLevel || 'info'
     },
-    bodyLimit: 50 * 1024 * 1024 // 50MB for binary uploads
+    // Behind the ALB, use X-Forwarded-For as the client IP (correct source for
+    // rate limiting and logs). Safe because the instance SG only accepts traffic
+    // from the ALB, which sets XFF.
+    trustProxy: true,
+    // Small global limit (M6): unauthenticated routes (mock endpoints, login,
+    // setup) can't be abused to buffer huge bodies. The few admin routes that
+    // accept large base64/upload payloads raise it per-route (see routes/admin.js).
+    bodyLimit: 1 * 1024 * 1024 // 1MB
   };
   
   // Add HTTPS if configured

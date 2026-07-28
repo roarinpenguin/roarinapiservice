@@ -2,11 +2,31 @@
 
 const configManager = require('../config/configManager');
 const certificates = require('../utils/certificates');
+const { createRateLimiter } = require('../plugins/rateLimit');
 const { exec } = require('child_process');
 const fs = require('fs');
 
 async function adminRoutes(fastify, options) {
-  
+
+  // Raised body limit for the authenticated admin routes that legitimately
+  // accept large payloads (base64 assets/images, config import, uploads). The
+  // global default is small (M6); these opt back up to 50MB.
+  const UPLOAD_BODY_LIMIT = 50 * 1024 * 1024;
+
+  // Per-IP rate limiting on the unauthenticated auth endpoints (H2 brute-force).
+  const RATE_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+  const loginLimiter = createRateLimiter({
+    name: 'login',
+    max: parseInt(process.env.LOGIN_RATE_LIMIT || '10', 10),
+    windowMs: RATE_WINDOW_MS
+  });
+  const setupLimiter = createRateLimiter({
+    name: 'setup',
+    max: parseInt(process.env.SETUP_RATE_LIMIT || '10', 10),
+    windowMs: RATE_WINDOW_MS
+  });
+
+
   // Check setup status
   fastify.get('/setup-status', async (request, reply) => {
     return { 
@@ -16,7 +36,7 @@ async function adminRoutes(fastify, options) {
   });
   
   // Initial setup
-  fastify.post('/setup', async (request, reply) => {
+  fastify.post('/setup', { preHandler: [setupLimiter.preHandler] }, async (request, reply) => {
     if (fastify.isSetupComplete()) {
       return reply.code(400).send({ error: 'Setup already complete' });
     }
@@ -40,7 +60,7 @@ async function adminRoutes(fastify, options) {
     reply.setCookie('sessionToken', token, {
       path: '/',
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: request.protocol === 'https',
       sameSite: 'strict',
       maxAge: 24 * 60 * 60 // 24 hours
     });
@@ -49,7 +69,7 @@ async function adminRoutes(fastify, options) {
   });
   
   // Login
-  fastify.post('/login', async (request, reply) => {
+  fastify.post('/login', { preHandler: [loginLimiter.preHandler] }, async (request, reply) => {
     const { password } = request.body;
     const token = fastify.login(password);
     
@@ -60,7 +80,7 @@ async function adminRoutes(fastify, options) {
     reply.setCookie('sessionToken', token, {
       path: '/',
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: request.protocol === 'https',
       sameSite: 'strict',
       maxAge: 24 * 60 * 60
     });
@@ -113,7 +133,7 @@ async function adminRoutes(fastify, options) {
   });
   
   // Create endpoint
-  fastify.post('/endpoints', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
+  fastify.post('/endpoints', { preHandler: [fastify.requireAuth], bodyLimit: UPLOAD_BODY_LIMIT }, async (request, reply) => {
     const { path, method, description, protected: isProtected, token, parameterSource, parameters, responseType, responses, enabled } = request.body;
     
     if (!path || !method) {
@@ -161,7 +181,7 @@ async function adminRoutes(fastify, options) {
   });
   
   // Update endpoint
-  fastify.put('/endpoints/:id', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
+  fastify.put('/endpoints/:id', { preHandler: [fastify.requireAuth], bodyLimit: UPLOAD_BODY_LIMIT }, async (request, reply) => {
     const updates = { ...request.body };
     
     // Process binary file uploads for updates
@@ -195,7 +215,7 @@ async function adminRoutes(fastify, options) {
   // ===== ASSETS MANAGEMENT =====
   
   // Upload asset
-  fastify.post('/assets', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
+  fastify.post('/assets', { preHandler: [fastify.requireAuth], bodyLimit: UPLOAD_BODY_LIMIT }, async (request, reply) => {
     const data = await request.file();
     if (!data) {
       return reply.code(400).send({ error: 'No file uploaded' });
@@ -236,7 +256,7 @@ async function adminRoutes(fastify, options) {
   });
 
   // Upload / change the blueprint image (PNG only, always stored as blueprint.png)
-  fastify.post('/blueprint', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
+  fastify.post('/blueprint', { preHandler: [fastify.requireAuth], bodyLimit: UPLOAD_BODY_LIMIT }, async (request, reply) => {
     const data = await request.file();
     if (!data) {
       return reply.code(400).send({ error: 'No file uploaded' });
@@ -306,7 +326,7 @@ async function adminRoutes(fastify, options) {
   });
   
   // Import configuration
-  fastify.post('/import', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
+  fastify.post('/import', { preHandler: [fastify.requireAuth], bodyLimit: UPLOAD_BODY_LIMIT }, async (request, reply) => {
     try {
       const data = request.body;
       
@@ -318,7 +338,8 @@ async function adminRoutes(fastify, options) {
       
       return { success: true, message: 'Configuration imported successfully' };
     } catch (err) {
-      return reply.code(400).send({ error: 'Failed to import configuration: ' + err.message });
+      request.log.error({ err }, 'Config import failed');
+      return reply.code(400).send({ error: 'Failed to import configuration' });
     }
   });
   
@@ -558,7 +579,7 @@ async function adminRoutes(fastify, options) {
   });
   
   // Upload banner image
-  fastify.post('/theme/banner', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
+  fastify.post('/theme/banner', { preHandler: [fastify.requireAuth], bodyLimit: UPLOAD_BODY_LIMIT }, async (request, reply) => {
     const { imageData } = request.body;
     
     if (!imageData) {
