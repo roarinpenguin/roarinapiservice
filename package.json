@@ -16,7 +16,7 @@
     "@fastify/formbody": "^8.0.0",
     "@fastify/multipart": "^9.0.0",
     "@fastify/static": "^10.1.2",
-    "fastify-plugin": "^5.0.0"
+    "fastify-plugin": "^6.0.0"
   },
   "engines": {
     "node": ">=20.0.0"
