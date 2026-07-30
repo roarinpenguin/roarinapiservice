@@ -12,6 +12,9 @@ A dynamic, configurable API mock service with a web-based admin UI. Built with *
 - **Docker Ready** — Optimized multi-stage Docker build (~50MB image)
 - **Export/Import** — Full configuration portability
 - **Lightweight Admin UI** — Alpine.js with custom purple theme (~25KB)
+- **Security Hardening** — Rate limiting on auth endpoints, CSP/security headers via `@fastify/helmet`, one-time setup token for first launch
+- **HTTPS/TLS Support** — Self-signed or custom certificates, configurable per environment
+- **AWS-Ready Deployment** — Terraform for a full HA architecture (ALB, WAF, EFS, auto-scaling)
 
 ## 🚀 Quick Start
 
@@ -43,33 +46,47 @@ open http://localhost:4242/admin
 
 ## 🔐 First Launch
 
-On first launch, you'll be prompted to create an admin password. This password is stored securely (hashed) in the data volume and persists across restarts.
+On first launch, the server generates a one-time **setup token** and prints it to the console (or reads it from the `SETUP_TOKEN` env var if you set one). You'll need that token, plus a new admin password, to complete setup at `/admin`. The password is stored securely (hashed) in the data volume and persists across restarts.
+
+By default the server starts with HTTPS enabled using a self-signed certificate — set `USE_HTTPS=false` to run plain HTTP instead (e.g. behind a TLS-terminating load balancer).
 
 ## 📁 Project Structure
 
 ```
 roarinapiservice/
 ├── src/
-│   ├── server.js              # Main Fastify server
-│   ├── cluster.js             # Multi-worker support
+│   ├── server.js               # Main Fastify server
+│   ├── cluster.js              # Multi-worker support
 │   ├── config/
-│   │   └── configManager.js   # Configuration persistence
+│   │   └── configManager.js    # Configuration persistence
 │   ├── plugins/
-│   │   └── auth.js            # Authentication plugin
+│   │   ├── auth.js             # Authentication plugin
+│   │   ├── rateLimit.js        # In-memory rate limiter (auth endpoints)
+│   │   └── securityHeaders.js  # CSP/security headers fallback (no @fastify/helmet)
 │   ├── routes/
-│   │   ├── admin.js           # Admin API routes
-│   │   └── dynamic.js         # Dynamic endpoint handler
+│   │   ├── admin.js            # Admin API routes
+│   │   └── dynamic.js          # Dynamic endpoint handler
+│   ├── utils/
+│   │   └── certificates.js     # Self-signed / custom TLS certificate loading
 │   └── public/
-│       └── index.html         # Admin UI (Alpine.js)
-├── data/                      # Persistent data (gitignored)
-│   ├── config.json            # Server configuration
-│   ├── endpoints.json         # Endpoint definitions
-│   └── assets/                # Binary/image assets
+│       └── index.html          # Admin UI (Alpine.js)
+├── data/                       # Persistent data (gitignored)
+│   ├── config.json             # Server configuration
+│   ├── endpoints.json          # Endpoint definitions
+│   └── assets/                 # Binary/image assets
+├── deploy/
+│   ├── DEPLOY.md            # Step-by-step AWS deployment guide
+│   └── terraform/           # HA AWS architecture (ALB, WAF, EFS, IAM, ASG, DNS/TLS)
+├── test/
+│   └── security.test.js        # Rate limiting / security header tests
+├── .github/
+│   ├── workflows/ci.yml        # Test suite, boot smoke test, dependency audit
+│   └── dependabot.yml          # Automated dependency update PRs
 ├── nginx/
-│   └── nginx.conf             # NGINX reverse proxy config
-├── Dockerfile                 # Multi-stage Docker build
-├── docker-compose.yml         # Docker Compose setup
-├── openapi.yaml               # OpenAPI 3.0 spec (admin API + endpoints)
+│   └── nginx.conf              # NGINX reverse proxy config
+├── Dockerfile                  # Multi-stage Docker build
+├── docker-compose.yml          # Docker Compose setup
+├── openapi.yaml                # OpenAPI 3.0 spec (admin API + endpoints)
 └── package.json
 ```
 
@@ -92,6 +109,8 @@ npx @redocly/cli preview-docs openapi.yaml
 | `HOST` | `0.0.0.0` | Bind address |
 | `DATA_DIR` | `./data` | Persistent data directory |
 | `NODE_ENV` | `development` | Environment mode |
+| `USE_HTTPS` | `true` | Set to `false` to serve plain HTTP (e.g. behind a TLS-terminating ALB) |
+| `SETUP_TOKEN` | *(generated)* | Provide your own first-launch setup token instead of the auto-generated one |
 
 ### Admin UI Features
 
@@ -130,6 +149,14 @@ Create custom endpoints via the Admin UI with:
 - **Response Type**: JSON, text, binary, or redirect
 - **Conditional Responses**: Return different data based on conditions
 
+## 🛡️ Security
+
+- **Rate Limiting** — In-memory fixed-window limiter on auth endpoints (login/setup) to slow down brute-force attempts. Defense-in-depth on top of any upstream WAF rate-based rules.
+- **Security Headers** — CSP, HSTS, `X-Frame-Options`, `X-Content-Type-Options`, etc. via `@fastify/helmet`, with a built-in fallback (`src/plugins/securityHeaders.js`) if helmet isn't installed.
+- **HTTPS/TLS** — Self-signed certs by default, or point at your own via `config.tls.useCustom` (see `src/utils/certificates.js`).
+- **One-Time Setup Token** — First-launch admin account creation requires a generated (or `SETUP_TOKEN`-provided) token, not just a password.
+- Covered by `test/security.test.js`.
+
 ## 🐳 Docker Deployment
 
 ```bash
@@ -146,6 +173,10 @@ docker run -d \
 # With docker-compose
 docker-compose up -d
 ```
+
+## ☁️ AWS Deployment
+
+For production, `deploy/terraform/` provisions a full HA architecture: ALB + WAF, auto-scaling group (2× `t4g.medium` by default), EFS for persistent data, IAM, security groups, and optional Route 53 + TLS. See [`deploy/DEPLOY.md`](deploy/DEPLOY.md) for the end-to-end walkthrough (build/push to ECR, `terraform apply`, smoke test) and [`deploy/terraform/README.md`](deploy/terraform/README.md) for architecture details and the OWASP Top 10 mapping.
 
 ## 📊 Resource Estimates
 
@@ -180,6 +211,18 @@ npm test
 # Build Docker image
 docker build -t roarinapi .
 ```
+
+## 🔄 CI/CD & Dependency Updates
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push/PR to `main`:
+
+- **Test suite** — `npm test`
+- **Boot smoke test** — starts the server and probes `/health` and `/ping`
+- **Dependency audit** — fails the build on any high/critical vulnerability (`npm audit --omit=dev --audit-level=high`), OWASP A06
+
+**Dependabot** (`.github/dependabot.yml`) is configured for weekly update PRs across `npm`, `docker`, and `github-actions` ecosystems.
+
+> **Note:** Dependabot is only *configured*, not necessarily *active*, everywhere this repo is mirrored. On GitHub.com it runs out of the box. On GitHub Enterprise Server instances, Dependabot (and Actions runners, for that matter) must be explicitly enabled by a site admin — the config file alone doesn't turn it on.
 
 ## 📝 License
 
